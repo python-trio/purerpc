@@ -17,6 +17,9 @@ def main():
             "h2~=3.0.1",
             "protobuf",
         ],
+        tests_require=[
+            "grpcio"
+        ]
     )
 
 

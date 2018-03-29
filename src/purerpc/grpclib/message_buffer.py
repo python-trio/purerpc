@@ -45,7 +45,6 @@ class MessageBuffer:
                 break
             compressed_flag, message_length = struct.unpack('>?I', self._buffer[pos:pos + 5])
             if pos + 5 + message_length > len(self._buffer):
-                self._buffer = self._buffer[pos:]
                 break
             else:
                 pos += 5
@@ -54,6 +53,8 @@ class MessageBuffer:
                 if compressed_flag:
                     data = self.decompress(data)
                 messages.append(data)
+
+        self._buffer = self._buffer[pos:]
         return messages
 
     def write_complete_message(self, data: bytes, compress=False):

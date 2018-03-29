@@ -24,12 +24,10 @@ class MessageStream:
         return self
 
     async def __anext__(self):
-        if self.closed:
-            raise StopAsyncIteration
-        while not self.message_deque:
+        while not self.closed and not self.message_deque:
             await self.data_ready_event.wait()
-            if self.closed:
-                raise StopAsyncIteration
+        if self.closed and not self.message_deque:
+            raise StopAsyncIteration
         return self.message_deque.popleft()
 
 
@@ -115,6 +113,7 @@ class ConnectionHandler:
             await self.write_all_pending_data()
 
     def message_received(self, event: MessageReceived):
+        print("Message received {}".format(event.data))
         self.request_message_streams[event.stream_id].put(event.data)
 
     def request_ended(self, event: RequestEnded):
