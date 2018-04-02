@@ -47,10 +47,8 @@ service = Service(50055)
 
 
 @service.rpc("SayHelloToMany", HelloRequest)
-async def say_hello_to_many(message_reader):
-    async for message in message_reader:
-        await trio.sleep(0.2)
-        yield HelloReply(message="Hello, " + message.name)
+async def say_hello_to_many(message_iterator):
+    yield HelloReply(message="Hello world")
 
 
 if __name__ == "__main__":

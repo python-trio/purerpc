@@ -9,7 +9,7 @@ import h2.exceptions
 from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded
 from .exceptions import ProtocolError
-from .message_buffer import MessageBuffer
+from .buffers import MessageReadBuffer, MessageWriteBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -18,15 +18,23 @@ class GRPCConnection:
     def __init__(self, config: GRPCConfiguration):
         self.config = config
         self.h2_connection = h2.connection.H2Connection(config.h2_config)
-        self.input_message_buffers = {}
-        self.output_message_buffers = {}
+        self.message_read_buffers = {}
+
+        # if stream_id in this dict, that means that write stream end was requested and the
+        # corresponding value are the trailers that should be sent by data_to_send() or None if
+        # we should just end the stream
+        # data_to_send method is responsible for clearing all of the data structures below when
+        # the corresponding stream has ended
+        self.stream_write_trailers = {}
+        self.message_write_buffers = {}
+        self.stream_write_pending = set()
 
     def _request_received(self, event: h2.events.RequestReceived):
         if event.stream_ended:
             raise ProtocolError("Stream ended before data was sent")
         request = RequestReceived.parse_from_stream_id_and_headers_destructive(
             event.stream_id, dict(event.headers))
-        self.input_message_buffers[event.stream_id] = MessageBuffer(request.message_encoding)
+        self.message_read_buffers[event.stream_id] = MessageReadBuffer(request.message_encoding)
         return [request]
 
     def _response_received(self, event: h2.events.ResponseReceived):
@@ -40,7 +48,7 @@ class GRPCConnection:
         else:
             if len(headers) > 0:
                 raise ProtocolError("Unparsed headers: {}".format(headers))
-            self.input_message_buffers[event.stream_id] = MessageBuffer(
+            self.message_read_buffers[event.stream_id] = MessageReadBuffer(
                 response_received.message_encoding)
             return [response_received]
 
@@ -54,14 +62,14 @@ class GRPCConnection:
 
     def _data_received(self, event: h2.events.DataReceived):
         try:
-            self.input_message_buffers[event.stream_id].write(event.data)
+            self.message_read_buffers[event.stream_id].data_received(event.data)
         except KeyError:
             self.h2_connection.reset_stream(event.stream_id, h2.errors.ErrorCodes.PROTOCOL_ERROR)
         else:
             self.h2_connection.acknowledge_received_data(event.flow_controlled_length,
                                                          event.stream_id)
         events = []
-        for message in self.input_message_buffers[event.stream_id].read_all_complete_messages():
+        for message in self.message_read_buffers[event.stream_id].read_all_complete_messages():
             events.append(MessageReceived(event.stream_id, message))
         return events
 
@@ -77,8 +85,8 @@ class GRPCConnection:
         raise NotImplementedError()
 
     def _stream_ended(self, event: h2.events.StreamEnded):
-        if event.stream_id in self.input_message_buffers:
-            del self.input_message_buffers[event.stream_id]
+        if event.stream_id in self.message_read_buffers:
+            del self.message_read_buffers[event.stream_id]
             return [RequestEnded(event.stream_id)]
         return []
 
@@ -127,6 +135,30 @@ class GRPCConnection:
         self.h2_connection.initiate_connection()
 
     def data_to_send(self, amount: int = None):
+        stream_write_pending_remove_flag = []
+        for stream_id in self.stream_write_pending:
+            num_bytes_to_send = min(self.h2_connection.max_outbound_frame_size,
+                                    self.h2_connection.local_flow_control_window(stream_id),
+                                    len(self.message_write_buffers[stream_id]))
+            data_to_send = self.message_write_buffers[stream_id].data_to_send(num_bytes_to_send)
+            self.h2_connection.send_data(stream_id, data_to_send)
+            if len(self.message_write_buffers[stream_id]) == 0:
+                stream_write_pending_remove_flag.append(stream_id)
+        for stream_id in stream_write_pending_remove_flag:
+            self.stream_write_pending.remove(stream_id)
+
+        stream_ended = []
+        for stream_id, trailers in self.stream_write_trailers.items():
+            if stream_id not in self.stream_write_pending:
+                if trailers is None:
+                    self.h2_connection.send_data(stream_id, b"", end_stream=True)
+                else:
+                    self.h2_connection.send_headers(stream_id, trailers, end_stream=True)
+                stream_ended.append(stream_id)
+        for stream_id in stream_ended:
+            del self.stream_write_trailers[stream_id]
+            del self.message_write_buffers[stream_id]
+
         return self.h2_connection.data_to_send(amount)
 
     def receive_data(self, data: bytes):
@@ -138,14 +170,38 @@ class GRPCConnection:
         return grpc_events
 
     def send_message(self, stream_id: int, message: bytes, compress=False):
-        message_buffer = self.output_message_buffers[stream_id]
-        message_buffer.write_complete_message(message, compress)
-        self.h2_connection.send_data(stream_id, message_buffer.read())
+        # TODO: this should apply backpressure if client is receiving too slow
+        """
+        Actually we may implement this method buffered, but then there will be two options:
+        1. Users apply backpressure manually, like this (may be run in multiple threads):
+
+        > grpc_connection.send_message(stream_id, message)
+        > while True:
+        >   data = grpc_connection.data_to_send()
+        >   if not data:
+        >     break
+        >   async with strict_fifo_lock:
+        >     stream.sendall(data)
+
+        This will work if all stream.sendall calls are guarded with lock, which works in strict
+        FIFO order.
+
+        2. If we don't want backpressure, we can spawn separate thread just for writing,
+        communication with this thread should go through special write_event:
+
+        > while True:
+        >   while self.connection.data_to_send() > 0:
+        >      await self.stream.sendall(...)
+        >   await self.write_event.wait()
+
+        """
+        self.message_write_buffers[stream_id].write_message(message, compress)
+        self.stream_write_pending.add(stream_id)
 
     def start_request(self, stream_id: int, scheme: str, service_name: str, method_name: str,
                       message_type=None, authority=None, timeout: datetime.timedelta=None,
                       content_type_suffix="", custom_metadata=()):
-        self.output_message_buffers[stream_id] = MessageBuffer(self.config.message_encoding)
+        self.message_write_buffers[stream_id] = MessageWriteBuffer(self.config.message_encoding)
         headers = [
             (":method", "POST"),
             (":scheme", scheme),
@@ -177,11 +233,11 @@ class GRPCConnection:
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def end_request(self, stream_id: int):
-        del self.output_message_buffers[stream_id]
-        self.h2_connection.send_data(stream_id, b"", end_stream=True)
+        self.stream_write_trailers[stream_id] = None
+        self.stream_write_pending.add(stream_id)
 
     def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
-        self.output_message_buffers[stream_id] = MessageBuffer(self.config.message_encoding)
+        self.message_write_buffers[stream_id] = MessageWriteBuffer(self.config.message_encoding)
         headers = [
             (":status", "200"),
             ("content-type", "application/grpc" + content_type_suffix),
@@ -194,12 +250,12 @@ class GRPCConnection:
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def end_response(self, stream_id: int, status: int, status_message=None, custom_metadata=()):
-        del self.output_message_buffers[stream_id]
-        headers = [
+        trailers = [
             ("grpc-status", str(status)),
             *custom_metadata,
         ]
         if status_message is not None:
             # TODO: should be percent encoded
-            headers.append(("grpc-message", status_message))
-        self.h2_connection.send_headers(stream_id, headers, end_stream=True)
+            trailers.append(("grpc-message", status_message))
+        self.stream_write_trailers[stream_id] = trailers
+        self.stream_write_pending.add(stream_id)
