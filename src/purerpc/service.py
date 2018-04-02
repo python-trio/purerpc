@@ -4,6 +4,7 @@ import logging
 import collections
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import MessageReceived, RequestReceived, RequestEnded
+from async_generator import async_generator, yield_
 
 
 class AClosing:
@@ -22,19 +23,21 @@ class CallbackWrapper:
         self.in_type = in_type
         self.rpc_callback = rpc_callback
 
+    @async_generator
     async def deserializing_iterator(self, input_stream: trio.Queue):
         async for data in input_stream:
             if data is None:
                 return
             message = self.in_type()
             message.ParseFromString(data)
-            yield message
+            await yield_(message)
 
+    @async_generator
     async def __call__(self, input_queue: trio.Queue):
         iter = self.deserializing_iterator(input_queue)
         async with AClosing(self.rpc_callback(iter)) as temp:
             async for message in temp:
-                yield message.SerializeToString()
+                await yield_(message.SerializeToString())
 
 
 class Service:
@@ -58,7 +61,6 @@ class ConnectionHandler:
 
     def __init__(self, service: Service):
 
-        logging.info("Constructing connection handler")
         config = GRPCConfiguration(client_side=False)
         self.connection = GRPCConnection(config=config)
         self.service = service
@@ -85,7 +87,6 @@ class ConnectionHandler:
                 data = self.connection.data_to_send()
                 if not data:
                     break
-                logging.info("Sending {}".format(data))
                 await self.stream.send_all(data)
             if self.write_shutdown:
                 return
@@ -94,45 +95,43 @@ class ConnectionHandler:
         self.write_event.set()
         await trio.sleep(0)
 
+    def ping_writer_noblock(self):
+        self.write_event.set()
+
     async def request_received(self, event: RequestReceived, *,
                                task_status=trio.TASK_STATUS_IGNORED):
         input_queue = trio.Queue(10)
-        logging.info("Creating message queue for {}".format(event.stream_id))
         self.request_message_queue[event.stream_id] = input_queue
         self.connection.start_response(event.stream_id, "+proto")
         task_status.started()
-        await self.ping_writer()
+        self.ping_writer_noblock()
 
         try:
             async for message in self.service.methods[event.method_name](input_queue):
                 self.connection.send_message(event.stream_id, message)
-                await self.ping_writer()
+                self.ping_writer_noblock()
 
-            print("Ending response")
             self.connection.end_response(event.stream_id, 0)
-            await self.ping_writer()
+            self.ping_writer_noblock()
         except:
             logging.exception("Got exception while writing response stream")
             self.connection.end_response(event.stream_id, 1, status_message=repr(sys.exc_info()))
             await self.ping_writer()
 
     async def message_received(self, event: MessageReceived):
-        logging.info("Message received {}".format(event.data))
         await self.request_message_queue[event.stream_id].put(event.data)
 
     async def request_ended(self, event: RequestEnded):
         await self.request_message_queue[event.stream_id].put(None)
-        logging.info("Deleting message queue for {}".format(event.stream_id))
         del self.request_message_queue[event.stream_id]
 
     async def __call__(self, server_stream):
-        logging.info("In __call__")
         self.stream = server_stream
         try:
             async with trio.open_nursery() as nursery:
                 await nursery.start(self.stream_writer)
                 self.connection.initiate_connection()
-                await self.ping_writer()
+                self.ping_writer_noblock()
 
                 try:
                     while True:
@@ -148,7 +147,7 @@ class ConnectionHandler:
                                 await self.request_ended(event)
                             elif isinstance(event, MessageReceived):
                                 await self.message_received(event)
-                        await self.ping_writer()
+                        self.ping_writer_noblock()
                 finally:
                     self.write_shutdown = True
                     await self.ping_writer()

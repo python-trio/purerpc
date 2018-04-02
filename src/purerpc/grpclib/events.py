@@ -10,18 +10,18 @@ class Event:
 class RequestReceived(Event):
     def __init__(self, stream_id: int, scheme: str, service_name: str, method_name: str,
                  content_type: str):
-        self.stream_id: int = stream_id
-        self.scheme: str = scheme
-        self.service_name: str = service_name
-        self.method_name: str = method_name
-        self.content_type: str = content_type
-        self.authority: str = None
-        self.timeout: datetime.timedelta = None
-        self.message_type: str = None
-        self.message_encoding: str = None
-        self.message_accept_encoding: list = None
-        self.user_agent: str = None
-        self.custom_metadata: dict = {}
+        self.stream_id = stream_id
+        self.scheme = scheme
+        self.service_name = service_name
+        self.method_name = method_name
+        self.content_type = content_type
+        self.authority = None
+        self.timeout = None
+        self.message_type = None
+        self.message_encoding = None
+        self.message_accept_encoding = None
+        self.user_agent = None
+        self.custom_metadata = {}
 
     @staticmethod
     def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: dict):
@@ -92,22 +92,22 @@ class RequestReceived(Event):
 
 class MessageReceived(Event):
     def __init__(self, stream_id: int, data: bytes):
-        self.stream_id: int = stream_id
-        self.data: bytes = data
+        self.stream_id = stream_id
+        self.data = data
 
 
 class RequestEnded(Event):
     def __init__(self, stream_id: int):
-        self.stream_id: int = stream_id
+        self.stream_id = stream_id
 
 
 class ResponseReceived(Event):
     def __init__(self, stream_id: int, content_type: str):
-        self.stream_id: int = stream_id
-        self.content_type: str = content_type
-        self.message_encoding: str = None
-        self.message_accept_encoding: str = None
-        self.custom_metadata: dict = {}
+        self.stream_id = stream_id
+        self.content_type = content_type
+        self.message_encoding = None
+        self.message_accept_encoding = None
+        self.custom_metadata = {}
 
     @staticmethod
     def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: dict):
@@ -139,10 +139,10 @@ class ResponseReceived(Event):
 
 class ResponseEnded(Event):
     def __init__(self, stream_id: int, status: int):
-        self.stream_id: int = stream_id
-        self.status: int = status
-        self.status_message: str = None
-        self.custom_metadata: dict = {}
+        self.stream_id = stream_id
+        self.status = status
+        self.status_message = None
+        self.custom_metadata = {}
 
     @staticmethod
     def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: dict):

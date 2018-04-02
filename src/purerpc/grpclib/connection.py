@@ -165,8 +165,39 @@ class GRPCConnection:
         events = self.h2_connection.receive_data(data)
         grpc_events = []
         for event in events:
-            logger.info("Get event: {}".format(event))
-            grpc_events.extend(self.HANDLER_MAP[type(event)](self, event))
+            if isinstance(event, h2.events.RequestReceived):
+                grpc_events.extend(self._request_received(event))
+            elif isinstance(event, h2.events.ResponseReceived):
+                grpc_events.extend(self._response_received(event))
+            elif isinstance(event, h2.events.TrailersReceived):
+                grpc_events.extend(self._trailers_received(event))
+            elif isinstance(event, h2.events.InformationalResponseReceived):
+                grpc_events.extend(self._informational_response_received(event))
+            elif isinstance(event, h2.events.DataReceived):
+                grpc_events.extend(self._data_received(event))
+            elif isinstance(event, h2.events.WindowUpdated):
+                grpc_events.extend(self._window_updated(event))
+            elif isinstance(event, h2.events.RemoteSettingsChanged):
+                grpc_events.extend(self._remote_settings_changed(event))
+            elif isinstance(event, h2.events.PingAcknowledged):
+                grpc_events.extend(self._ping_acknowledged(event))
+            elif isinstance(event, h2.events.StreamEnded):
+                grpc_events.extend(self._stream_ended(event))
+            elif isinstance(event, h2.events.StreamReset):
+                grpc_events.extend(self._stream_reset(event))
+            elif isinstance(event, h2.events.PushedStreamReceived):
+                grpc_events.extend(self._push_stream_received(event))
+            elif isinstance(event, h2.events.SettingsAcknowledged):
+                grpc_events.extend(self._settings_acknowledged(event))
+            elif isinstance(event, h2.events.PriorityUpdated):
+                grpc_events.extend(self._priority_updated(event))
+            elif isinstance(event, h2.events.ConnectionTerminated):
+                grpc_events.extend(self._connection_terminated(event))
+            elif isinstance(event, h2.events.AlternativeServiceAvailable):
+                grpc_events.extend(self._alternative_service_available(event))
+            elif isinstance(event, h2.events.UnknownFrameReceived):
+                grpc_events.extend(self._unknown_frame_received(event))
+
         return grpc_events
 
     def send_message(self, stream_id: int, message: bytes, compress=False):

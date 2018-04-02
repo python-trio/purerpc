@@ -5,6 +5,7 @@ import trio
 
 from purerpc.service import Service
 from greeter_pb2 import HelloRequest, HelloReply
+from async_generator import async_generator, yield_
 
 
 def configure_logs(log_file=None):
@@ -18,13 +19,13 @@ def configure_logs(log_file=None):
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
-                "level": "INFO",
+                "level": "WARNING",
                 "formatter": "simple",
                 "stream": "ext://sys.stdout",
             }
         },
         "root": {
-            "level": "DEBUG",
+            "level": "WARNING",
             "handlers": ["console"],
         },
         "disable_existing_loggers": False
@@ -47,8 +48,9 @@ service = Service(50055)
 
 
 @service.rpc("SayHelloToMany", HelloRequest)
+@async_generator
 async def say_hello_to_many(message_iterator):
-    yield HelloReply(message="Hello world")
+    await yield_(HelloReply(message="Hello world"))
 
 
 if __name__ == "__main__":
