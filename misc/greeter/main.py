@@ -1,9 +1,9 @@
 import logging
 import logging.config
 
-import trio
+import curio
 
-from purerpc.service import Service
+from purerpc.curio_service import Service
 from greeter_pb2 import HelloRequest, HelloReply
 from async_generator import async_generator, yield_
 
@@ -54,4 +54,4 @@ async def say_hello_to_many(message_iterator):
 
 
 if __name__ == "__main__":
-    trio.run(service)
+    curio.run(service)

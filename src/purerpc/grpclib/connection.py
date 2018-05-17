@@ -58,7 +58,7 @@ class GRPCConnection:
         return [response_ended]
 
     def _informational_response_received(self, event: h2.events.InformationalResponseReceived):
-        raise NotImplementedError()
+        return []
 
     def _data_received(self, event: h2.events.DataReceived):
         try:
@@ -82,7 +82,7 @@ class GRPCConnection:
         return []
 
     def _ping_acknowledged(self, event: h2.events.PingAcknowledged):
-        raise NotImplementedError()
+        return []
 
     def _stream_ended(self, event: h2.events.StreamEnded):
         if event.stream_id in self.message_read_buffers:
@@ -91,26 +91,26 @@ class GRPCConnection:
         return []
 
     def _stream_reset(self, event: h2.events.StreamReset):
-        raise NotImplementedError()
+        return []
 
     def _push_stream_received(self, event: h2.events.PushedStreamReceived):
-        raise NotImplementedError()
+        return []
 
     def _settings_acknowledged(self, event: h2.events.SettingsAcknowledged):
         # TODO: implement this
         return []
 
     def _priority_updated(self, event: h2.events.PriorityUpdated):
-        raise NotImplementedError()
+        return []
 
     def _connection_terminated(self, event: h2.events.ConnectionTerminated):
-        raise NotImplementedError()
+        return []
 
     def _alternative_service_available(self, event: h2.events.AlternativeServiceAvailable):
-        raise NotImplementedError()
+        return []
 
     def _unknown_frame_received(self, event: h2.events.UnknownFrameReceived):
-        raise NotImplementedError()
+        return []
 
     HANDLER_MAP = {
         h2.events.RequestReceived: _request_received,
