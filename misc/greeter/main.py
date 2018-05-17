@@ -50,6 +50,13 @@ service = Service(50055)
 @service.rpc("SayHelloToMany", HelloRequest)
 @async_generator
 async def say_hello_to_many(message_iterator):
+    requests = []
+    async for message in message_iterator:
+        requests.append(message)
+
+    name = requests[0].name
+    for i in range(8):
+        name += name
     await yield_(HelloReply(message="Hello world"))
 
 

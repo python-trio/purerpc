@@ -10,4 +10,4 @@ AUTHORITY="localhost:50055"
 
 h2load -n$NUM_REQUESTS -c$NUM_CLIENTS -m$NUM_STREAMS -w$WINDOW_SIZE_LOG -t$NUM_THREADS -d request.bin \
   -H 'te: trailers' -H 'content-type: application/grpc+proto' \
-  http://$AUTHORITY/service/SayHelloToMany
+  http://$AUTHORITY/Greeter/SayHelloToMany

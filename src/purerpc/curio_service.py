@@ -25,7 +25,6 @@ class CallbackWrapper:
     @async_generator
     async def deserializing_iterator(self, input_stream: curio.Queue):
         async for data in input_stream:
-            print(data)
             if data is None:
                 return
             message = self.in_type()

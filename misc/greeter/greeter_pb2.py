@@ -38,7 +38,7 @@ _HELLOREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -69,7 +69,7 @@ _HELLOREPLY = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -105,217 +105,55 @@ HelloReply = _reflection.GeneratedProtocolMessageType('HelloReply', (_message.Me
 _sym_db.RegisterMessage(HelloReply)
 
 
-try:
-  # THESE ELEMENTS WILL BE DEPRECATED.
-  # Please use the generated *_pb2_grpc.py files instead.
-  import grpc
-  from grpc.beta import implementations as beta_implementations
-  from grpc.beta import interfaces as beta_interfaces
-  from grpc.framework.common import cardinality
-  from grpc.framework.interfaces.face import utilities as face_utilities
 
+_GREETER = _descriptor.ServiceDescriptor(
+  name='Greeter',
+  full_name='Greeter',
+  file=DESCRIPTOR,
+  index=0,
+  options=None,
+  serialized_start=79,
+  serialized_end=289,
+  methods=[
+  _descriptor.MethodDescriptor(
+    name='SayHello',
+    full_name='Greeter.SayHello',
+    index=0,
+    containing_service=None,
+    input_type=_HELLOREQUEST,
+    output_type=_HELLOREPLY,
+    options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='SayHelloGoodbye',
+    full_name='Greeter.SayHelloGoodbye',
+    index=1,
+    containing_service=None,
+    input_type=_HELLOREQUEST,
+    output_type=_HELLOREPLY,
+    options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='SayHelloToMany',
+    full_name='Greeter.SayHelloToMany',
+    index=2,
+    containing_service=None,
+    input_type=_HELLOREQUEST,
+    output_type=_HELLOREPLY,
+    options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='SayHelloToManyAtOnce',
+    full_name='Greeter.SayHelloToManyAtOnce',
+    index=3,
+    containing_service=None,
+    input_type=_HELLOREQUEST,
+    output_type=_HELLOREPLY,
+    options=None,
+  ),
+])
+_sym_db.RegisterServiceDescriptor(_GREETER)
 
-  class GreeterStub(object):
-    # missing associated documentation comment in .proto file
-    pass
+DESCRIPTOR.services_by_name['Greeter'] = _GREETER
 
-    def __init__(self, channel):
-      """Constructor.
-
-      Args:
-        channel: A grpc.Channel.
-      """
-      self.SayHello = channel.unary_unary(
-          '/Greeter/SayHello',
-          request_serializer=HelloRequest.SerializeToString,
-          response_deserializer=HelloReply.FromString,
-          )
-      self.SayHelloGoodbye = channel.unary_stream(
-          '/Greeter/SayHelloGoodbye',
-          request_serializer=HelloRequest.SerializeToString,
-          response_deserializer=HelloReply.FromString,
-          )
-      self.SayHelloToMany = channel.stream_stream(
-          '/Greeter/SayHelloToMany',
-          request_serializer=HelloRequest.SerializeToString,
-          response_deserializer=HelloReply.FromString,
-          )
-      self.SayHelloToManyAtOnce = channel.stream_unary(
-          '/Greeter/SayHelloToManyAtOnce',
-          request_serializer=HelloRequest.SerializeToString,
-          response_deserializer=HelloReply.FromString,
-          )
-
-
-  class GreeterServicer(object):
-    # missing associated documentation comment in .proto file
-    pass
-
-    def SayHello(self, request, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-      context.set_details('Method not implemented!')
-      raise NotImplementedError('Method not implemented!')
-
-    def SayHelloGoodbye(self, request, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-      context.set_details('Method not implemented!')
-      raise NotImplementedError('Method not implemented!')
-
-    def SayHelloToMany(self, request_iterator, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-      context.set_details('Method not implemented!')
-      raise NotImplementedError('Method not implemented!')
-
-    def SayHelloToManyAtOnce(self, request_iterator, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-      context.set_details('Method not implemented!')
-      raise NotImplementedError('Method not implemented!')
-
-
-  def add_GreeterServicer_to_server(servicer, server):
-    rpc_method_handlers = {
-        'SayHello': grpc.unary_unary_rpc_method_handler(
-            servicer.SayHello,
-            request_deserializer=HelloRequest.FromString,
-            response_serializer=HelloReply.SerializeToString,
-        ),
-        'SayHelloGoodbye': grpc.unary_stream_rpc_method_handler(
-            servicer.SayHelloGoodbye,
-            request_deserializer=HelloRequest.FromString,
-            response_serializer=HelloReply.SerializeToString,
-        ),
-        'SayHelloToMany': grpc.stream_stream_rpc_method_handler(
-            servicer.SayHelloToMany,
-            request_deserializer=HelloRequest.FromString,
-            response_serializer=HelloReply.SerializeToString,
-        ),
-        'SayHelloToManyAtOnce': grpc.stream_unary_rpc_method_handler(
-            servicer.SayHelloToManyAtOnce,
-            request_deserializer=HelloRequest.FromString,
-            response_serializer=HelloReply.SerializeToString,
-        ),
-    }
-    generic_handler = grpc.method_handlers_generic_handler(
-        'Greeter', rpc_method_handlers)
-    server.add_generic_rpc_handlers((generic_handler,))
-
-
-  class BetaGreeterServicer(object):
-    """The Beta API is deprecated for 0.15.0 and later.
-
-    It is recommended to use the GA API (classes and functions in this
-    file not marked beta) for all further purposes. This class was generated
-    only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0."""
-    # missing associated documentation comment in .proto file
-    pass
-    def SayHello(self, request, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-    def SayHelloGoodbye(self, request, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-    def SayHelloToMany(self, request_iterator, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-    def SayHelloToManyAtOnce(self, request_iterator, context):
-      # missing associated documentation comment in .proto file
-      pass
-      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-
-
-  class BetaGreeterStub(object):
-    """The Beta API is deprecated for 0.15.0 and later.
-
-    It is recommended to use the GA API (classes and functions in this
-    file not marked beta) for all further purposes. This class was generated
-    only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0."""
-    # missing associated documentation comment in .proto file
-    pass
-    def SayHello(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-      # missing associated documentation comment in .proto file
-      pass
-      raise NotImplementedError()
-    SayHello.future = None
-    def SayHelloGoodbye(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-      # missing associated documentation comment in .proto file
-      pass
-      raise NotImplementedError()
-    def SayHelloToMany(self, request_iterator, timeout, metadata=None, with_call=False, protocol_options=None):
-      # missing associated documentation comment in .proto file
-      pass
-      raise NotImplementedError()
-    def SayHelloToManyAtOnce(self, request_iterator, timeout, metadata=None, with_call=False, protocol_options=None):
-      # missing associated documentation comment in .proto file
-      pass
-      raise NotImplementedError()
-    SayHelloToManyAtOnce.future = None
-
-
-  def beta_create_Greeter_server(servicer, pool=None, pool_size=None, default_timeout=None, maximum_timeout=None):
-    """The Beta API is deprecated for 0.15.0 and later.
-
-    It is recommended to use the GA API (classes and functions in this
-    file not marked beta) for all further purposes. This function was
-    generated only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0"""
-    request_deserializers = {
-      ('Greeter', 'SayHello'): HelloRequest.FromString,
-      ('Greeter', 'SayHelloGoodbye'): HelloRequest.FromString,
-      ('Greeter', 'SayHelloToMany'): HelloRequest.FromString,
-      ('Greeter', 'SayHelloToManyAtOnce'): HelloRequest.FromString,
-    }
-    response_serializers = {
-      ('Greeter', 'SayHello'): HelloReply.SerializeToString,
-      ('Greeter', 'SayHelloGoodbye'): HelloReply.SerializeToString,
-      ('Greeter', 'SayHelloToMany'): HelloReply.SerializeToString,
-      ('Greeter', 'SayHelloToManyAtOnce'): HelloReply.SerializeToString,
-    }
-    method_implementations = {
-      ('Greeter', 'SayHello'): face_utilities.unary_unary_inline(servicer.SayHello),
-      ('Greeter', 'SayHelloGoodbye'): face_utilities.unary_stream_inline(servicer.SayHelloGoodbye),
-      ('Greeter', 'SayHelloToMany'): face_utilities.stream_stream_inline(servicer.SayHelloToMany),
-      ('Greeter', 'SayHelloToManyAtOnce'): face_utilities.stream_unary_inline(servicer.SayHelloToManyAtOnce),
-    }
-    server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
-    return beta_implementations.server(method_implementations, options=server_options)
-
-
-  def beta_create_Greeter_stub(channel, host=None, metadata_transformer=None, pool=None, pool_size=None):
-    """The Beta API is deprecated for 0.15.0 and later.
-
-    It is recommended to use the GA API (classes and functions in this
-    file not marked beta) for all further purposes. This function was
-    generated only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0"""
-    request_serializers = {
-      ('Greeter', 'SayHello'): HelloRequest.SerializeToString,
-      ('Greeter', 'SayHelloGoodbye'): HelloRequest.SerializeToString,
-      ('Greeter', 'SayHelloToMany'): HelloRequest.SerializeToString,
-      ('Greeter', 'SayHelloToManyAtOnce'): HelloRequest.SerializeToString,
-    }
-    response_deserializers = {
-      ('Greeter', 'SayHello'): HelloReply.FromString,
-      ('Greeter', 'SayHelloGoodbye'): HelloReply.FromString,
-      ('Greeter', 'SayHelloToMany'): HelloReply.FromString,
-      ('Greeter', 'SayHelloToManyAtOnce'): HelloReply.FromString,
-    }
-    cardinalities = {
-      'SayHello': cardinality.Cardinality.UNARY_UNARY,
-      'SayHelloGoodbye': cardinality.Cardinality.UNARY_STREAM,
-      'SayHelloToMany': cardinality.Cardinality.STREAM_STREAM,
-      'SayHelloToManyAtOnce': cardinality.Cardinality.STREAM_UNARY,
-    }
-    stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
-    return beta_implementations.dynamic_stub(channel, 'Greeter', cardinalities, options=stub_options)
-except ImportError:
-  pass
 # @@protoc_insertion_point(module_scope)
