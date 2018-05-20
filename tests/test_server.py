@@ -1,11 +1,12 @@
 import unittest
-import trio
+import curio
 import grpc
 import time
 import logging
 import logging.config
 import threading
 from .greeter_pb2 import HelloReply, HelloRequest, GreeterStub
+from async_generator import async_generator, yield_
 from purerpc.service import Service
 
 
@@ -54,16 +55,20 @@ class TestServer(unittest.TestCase):
         service = Service(port)
 
         @service.rpc("SayHelloToMany", HelloRequest)
+        @async_generator
         async def say_hello_to_many(message_reader):
             async for message in message_reader:
-                await trio.sleep(0.05)
-                yield HelloReply(message="Hello " + message.name)
+                await curio.sleep(0.05)
+                await yield_(HelloReply(message="Hello " + message.name))
 
         async def main():
-            with trio.move_on_after(10):
-                await service()
+            task = await curio.spawn(service)
+            start_time = time.time()
+            while time.time() < start_time + 10:
+                await curio.sleep(1.0)
+            await task.cancel()
 
-        trio.run(main)
+        curio.run(main)
 
     def test_server(self):
         thread = threading.Thread(target=self.run_server, args=(42419,))

@@ -13,8 +13,8 @@ def main():
         test_suite="tests",
         python_requires=">=3.5.2",
         install_requires=[
-            "trio~=0.3.0",
-            "h2~=3.0.1",
+            "async_generator",
+            "h2",
             "protobuf",
             "curio~=0.9.0",
         ],

@@ -1,7 +1,6 @@
 import sys
-import trio
+import curio
 import logging
-import collections
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import MessageReceived, RequestReceived, RequestEnded
 from async_generator import async_generator, yield_
@@ -24,7 +23,7 @@ class CallbackWrapper:
         self.rpc_callback = rpc_callback
 
     @async_generator
-    async def deserializing_iterator(self, input_stream: trio.Queue):
+    async def deserializing_iterator(self, input_stream: curio.Queue):
         async for data in input_stream:
             if data is None:
                 return
@@ -33,7 +32,7 @@ class CallbackWrapper:
             await yield_(message)
 
     @async_generator
-    async def __call__(self, input_queue: trio.Queue):
+    async def __call__(self, input_queue: curio.Queue):
         iter = self.deserializing_iterator(input_queue)
         async with AClosing(self.rpc_callback(iter)) as temp:
             async for message in temp:
@@ -53,7 +52,8 @@ class Service:
         return decorator
 
     async def __call__(self):
-        await trio.serve_tcp(lambda stream: ConnectionHandler(self)(stream), self.port)
+        await curio.tcp_server('', self.port, lambda c, a: ConnectionHandler(self)(c, a),
+                               reuse_address=True, reuse_port=True)
 
 
 class ConnectionHandler:
@@ -67,11 +67,11 @@ class ConnectionHandler:
 
         self.request_message_queue = {}
 
-        self.write_event = trio.Event()
+        self.write_event = curio.Event()
         self.write_shutdown = False
         self.stream = None
 
-    async def stream_writer(self, *, task_status=trio.TASK_STATUS_IGNORED):
+    async def stream_writer(self):
         # TODO: this should be the single thread that writes to self.stream, communication with
         # this thread should go through special event self.write_event
         # The logic is simple:
@@ -80,76 +80,70 @@ class ConnectionHandler:
         #      await self.stream.sendall(...)
         #   await self.write_event.wait()
         # TODO: second option: use StrictFIFOLock and write data in the threads that generate it
-        task_status.started()
         while True:
             await self.write_event.wait()
+            self.write_event.clear()
             while True:
                 data = self.connection.data_to_send()
                 if not data:
                     break
-                await self.stream.send_all(data)
+                await self.stream.sendall(data)
             if self.write_shutdown:
                 return
 
     async def ping_writer(self):
-        self.write_event.set()
-        await trio.sleep(0)
+        await self.write_event.set()
 
-    def ping_writer_noblock(self):
-        self.write_event.set()
-
-    async def request_received(self, event: RequestReceived, *,
-                               task_status=trio.TASK_STATUS_IGNORED):
-        input_queue = trio.Queue(10)
-        self.request_message_queue[event.stream_id] = input_queue
+    async def request_received(self, event: RequestReceived):
         self.connection.start_response(event.stream_id, "+proto")
-        task_status.started()
-        self.ping_writer_noblock()
+        await self.ping_writer()
 
         try:
-            async for message in self.service.methods[event.method_name](input_queue):
+            async for message in self.service.methods[event.method_name](self.request_message_queue[event.stream_id]):
                 self.connection.send_message(event.stream_id, message)
-                self.ping_writer_noblock()
+                await self.ping_writer()
 
             self.connection.end_response(event.stream_id, 0)
-            self.ping_writer_noblock()
+            await self.ping_writer()
         except:
             logging.exception("Got exception while writing response stream")
             self.connection.end_response(event.stream_id, 1, status_message=repr(sys.exc_info()))
             await self.ping_writer()
+        finally:
+            del self.request_message_queue[event.stream_id]
 
     async def message_received(self, event: MessageReceived):
         await self.request_message_queue[event.stream_id].put(event.data)
 
     async def request_ended(self, event: RequestEnded):
         await self.request_message_queue[event.stream_id].put(None)
-        del self.request_message_queue[event.stream_id]
 
-    async def __call__(self, server_stream):
-        self.stream = server_stream
+    async def __call__(self, client, addr):
+        self.stream = client
+        await curio.spawn(self.stream_writer(), daemon=True)
+        self.connection.initiate_connection()
+        await self.ping_writer()
+
+        task_group = curio.TaskGroup()
         try:
-            async with trio.open_nursery() as nursery:
-                await nursery.start(self.stream_writer)
-                self.connection.initiate_connection()
-                self.ping_writer_noblock()
-
-                try:
-                    while True:
-                        data = await server_stream.receive_some(self.RECEIVE_BUFFER_SIZE)
-                        if not data:
-                            return
-                        events = self.connection.receive_data(data)
-                        for event in events:
-                            if isinstance(event, RequestReceived):
-                                # start RPC thread
-                                await nursery.start(self.request_received, event)
-                            elif isinstance(event, RequestEnded):
-                                await self.request_ended(event)
-                            elif isinstance(event, MessageReceived):
-                                await self.message_received(event)
-                        self.ping_writer_noblock()
-                finally:
-                    self.write_shutdown = True
-                    await self.ping_writer()
+            while True:
+                data = await client.recv(self.RECEIVE_BUFFER_SIZE)
+                if not data:
+                    return
+                events = self.connection.receive_data(data)
+                for event in events:
+                    if isinstance(event, RequestReceived):
+                        # start RPC thread
+                        self.request_message_queue[event.stream_id] = curio.Queue(10)
+                        await task_group.spawn(self.request_received, event)
+                    elif isinstance(event, RequestEnded):
+                        await self.request_ended(event)
+                    elif isinstance(event, MessageReceived):
+                        await self.message_received(event)
+                await self.ping_writer()
         except:
             logging.exception("Got exception in main dispatch loop")
+        finally:
+            await task_group.join()
+            self.write_shutdown = True
+            await self.ping_writer()
