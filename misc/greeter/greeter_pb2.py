@@ -38,7 +38,7 @@ _HELLOREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -69,7 +69,7 @@ _HELLOREPLY = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -104,56 +104,5 @@ HelloReply = _reflection.GeneratedProtocolMessageType('HelloReply', (_message.Me
   ))
 _sym_db.RegisterMessage(HelloReply)
 
-
-
-_GREETER = _descriptor.ServiceDescriptor(
-  name='Greeter',
-  full_name='Greeter',
-  file=DESCRIPTOR,
-  index=0,
-  options=None,
-  serialized_start=79,
-  serialized_end=289,
-  methods=[
-  _descriptor.MethodDescriptor(
-    name='SayHello',
-    full_name='Greeter.SayHello',
-    index=0,
-    containing_service=None,
-    input_type=_HELLOREQUEST,
-    output_type=_HELLOREPLY,
-    options=None,
-  ),
-  _descriptor.MethodDescriptor(
-    name='SayHelloGoodbye',
-    full_name='Greeter.SayHelloGoodbye',
-    index=1,
-    containing_service=None,
-    input_type=_HELLOREQUEST,
-    output_type=_HELLOREPLY,
-    options=None,
-  ),
-  _descriptor.MethodDescriptor(
-    name='SayHelloToMany',
-    full_name='Greeter.SayHelloToMany',
-    index=2,
-    containing_service=None,
-    input_type=_HELLOREQUEST,
-    output_type=_HELLOREPLY,
-    options=None,
-  ),
-  _descriptor.MethodDescriptor(
-    name='SayHelloToManyAtOnce',
-    full_name='Greeter.SayHelloToManyAtOnce',
-    index=3,
-    containing_service=None,
-    input_type=_HELLOREQUEST,
-    output_type=_HELLOREPLY,
-    options=None,
-  ),
-])
-_sym_db.RegisterServiceDescriptor(_GREETER)
-
-DESCRIPTOR.services_by_name['Greeter'] = _GREETER
 
 # @@protoc_insertion_point(module_scope)

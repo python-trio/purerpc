@@ -1,6 +1,7 @@
 import unittest
 import curio
 import grpc
+import typing
 import time
 import logging
 import logging.config
@@ -8,7 +9,6 @@ import threading
 from .greeter_pb2 import HelloReply, HelloRequest, GreeterStub
 from async_generator import async_generator, yield_
 from purerpc.service import Service
-
 
 
 def configure_logs(log_file=None):
@@ -62,11 +62,7 @@ class TestServer(unittest.TestCase):
                 await yield_(HelloReply(message="Hello " + message.name))
 
         async def main():
-            task = await curio.spawn(service)
-            start_time = time.time()
-            while time.time() < start_time + 10:
-                await curio.sleep(1.0)
-            await task.cancel()
+            await curio.ignore_after(10, service)
 
         curio.run(main)
 
@@ -80,7 +76,6 @@ class TestServer(unittest.TestCase):
                 names = ('Foo', 'Bar', 'Bat', 'Baz')
                 for name in names:
                     yield HelloRequest(name=name)
-                    import time
 
             channel = grpc.insecure_channel('127.0.0.1:42419')
             print("Opening channel")

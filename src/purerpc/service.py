@@ -1,29 +1,31 @@
+import collections
 import sys
+import inspect
+import warnings
+from multiprocessing import Process
+
 import curio
+import typing
 import logging
+
+from purerpc.utils import is_linux, get_linux_kernel_version, AClosing
+
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import MessageReceived, RequestReceived, RequestEnded
 from async_generator import async_generator, yield_
 
 
-class AClosing:
-    def __init__(self, agen):
-        self._agen = agen
-
-    async def __aenter__(self):
-        return self._agen
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._agen.aclose()
+Stream = typing.AsyncIterator
 
 
-class CallbackWrapper:
-    def __init__(self, in_type, rpc_callback):
+class SerializingCallbackWrapper:
+    def __init__(self, func, in_type, out_type):
+        self.func = func
         self.in_type = in_type
-        self.rpc_callback = rpc_callback
+        self.out_type = out_type
 
     @async_generator
-    async def deserializing_iterator(self, input_stream: curio.Queue):
+    async def parsing_iterator(self, input_stream: curio.Queue):
         async for data in input_stream:
             if data is None:
                 return
@@ -33,37 +35,148 @@ class CallbackWrapper:
 
     @async_generator
     async def __call__(self, input_queue: curio.Queue):
-        iter = self.deserializing_iterator(input_queue)
-        async with AClosing(self.rpc_callback(iter)) as temp:
+        input_message_stream = self.parsing_iterator(input_queue)
+        async with AClosing(self.func(input_message_stream)) as temp:
             async for message in temp:
                 await yield_(message.SerializeToString())
 
 
 class Service:
-    def __init__(self, port=50055):
-        self.port = port
+    def __init__(self, name):
+        self.name = name
         self.methods = {}
 
-    def rpc(self, method_name, InputMessageType):
-        def decorator(rpc_callback):
-            wrapper = CallbackWrapper(InputMessageType, rpc_callback)
-            self.methods[method_name] = wrapper
-            return wrapper
+    def add_unary_unary(self, name, func, in_type, out_type):
+        print("Call unary_unary")
+        @async_generator
+        async def wrapper(input_stream):
+            message = None
+            async for elem in input_stream:
+                if message is not None:
+                    # TODO: raise meaningful error
+                    raise RuntimeError("Got multiple messages on unary stream")
+                else:
+                    message = elem
+            result = await func(message)
+            await yield_(result)
+        self.add_stream_stream(name, wrapper, in_type, out_type)
+
+    def add_unary_stream(self, name, func, in_type, out_type):
+        print("Call unary_stream")
+        @async_generator
+        async def wrapper(input_stream):
+            message = None
+            async for elem in input_stream:
+                if message is not None:
+                    # TODO: raise meaningful error
+                    raise RuntimeError("Got multiple messages on unary stream")
+                else:
+                    message = elem
+            async for result in func(message):
+                await yield_(result)
+        self.add_stream_stream(name, wrapper, in_type, out_type)
+
+    def add_stream_unary(self, name, func, in_type, out_type):
+        print("Call stream_unary")
+        @async_generator
+        async def wrapper(input_stream):
+            result = await func(input_stream)
+            await yield_(result)
+        self.add_stream_stream(name, wrapper, in_type, out_type)
+
+    def add_stream_stream(self, name, func, in_type, out_type):
+        print("Call stream_stream")
+        self.methods[name] = SerializingCallbackWrapper(func, in_type, out_type)
+
+    def rpc(self, method_name):
+        def decorator(func):
+            signature = inspect.signature(func)
+            if signature.return_annotation == signature.empty:
+                raise ValueError("Only annotated methods can be used with Service.rpc() decorator")
+            if len(signature.parameters) != 1:
+                raise ValueError("Only functions with one parameter can be used with Service.rpc("
+                                 ") decorator")
+            parameter = next(iter(signature.parameters.values()))
+            if parameter.annotation == parameter.empty:
+                raise ValueError("Only annotated methods can be used with Service.rpc() decorator")
+
+            in_annotation = parameter.annotation
+            out_annotation = signature.return_annotation
+
+            if issubclass(in_annotation, Stream):
+                in_type = in_annotation.__args__[0]
+                in_stream = True
+            else:
+                in_type = in_annotation
+                in_stream = False
+
+            if issubclass(out_annotation, Stream):
+                out_type = out_annotation.__args__[0]
+                out_stream = True
+            else:
+                out_type = out_annotation
+                out_stream = False
+
+            param_tuple = (method_name, func, in_type, out_type)
+            if in_stream and out_stream:
+                self.add_stream_stream(*param_tuple)
+            elif in_stream and not out_stream:
+                self.add_stream_unary(*param_tuple)
+            elif not in_stream and out_stream:
+                self.add_unary_stream(*param_tuple)
+            else:
+                self.add_unary_unary(*param_tuple)
+
+            return func
         return decorator
 
-    async def __call__(self):
+
+class Servicer:
+    @property
+    def service(self) -> Service:
+        raise NotImplementedError()
+
+
+class Server:
+    def __init__(self, port=50055, num_processes=1):
+        self.port = port
+        self.services = {}
+        self.num_processes = num_processes
+        if num_processes > 1 and (not is_linux() or get_linux_kernel_version() < (3, 9)):
+            warnings.warn("Selected num_processes > 1 and not running Linux kernel >= 3.9")
+
+    def add_service(self, service):
+        self.services[service.name] = service
+
+    async def _serve_async(self):
         await curio.tcp_server('', self.port, lambda c, a: ConnectionHandler(self)(c, a),
                                reuse_address=True, reuse_port=True)
+
+    def _target_fn(self):
+        curio.run(self._serve_async)
+
+    def serve(self):
+        if self.num_processes == 1:
+            self._target_fn()
+        else:
+            # this is simple SO_REUSEPORT load balancing on Linux
+            processes = []
+            for i in range(self.num_processes):
+                process = Process(target=self._target_fn)
+                process.start()
+                processes.append(process)
+            for process in processes:
+                process.join()
 
 
 class ConnectionHandler:
     RECEIVE_BUFFER_SIZE = 65536
 
-    def __init__(self, service: Service):
+    def __init__(self, server: Server):
 
         config = GRPCConfiguration(client_side=False)
         self.connection = GRPCConnection(config=config)
-        self.service = service
+        self.server = server
 
         self.request_message_queue = {}
 
@@ -99,7 +212,9 @@ class ConnectionHandler:
         await self.ping_writer()
 
         try:
-            async for message in self.service.methods[event.method_name](self.request_message_queue[event.stream_id]):
+            service = self.server.services[event.service_name]
+            method_fn = service.methods[event.method_name]
+            async for message in method_fn(self.request_message_queue[event.stream_id]):
                 self.connection.send_message(event.stream_id, message)
                 await self.ping_writer()
 

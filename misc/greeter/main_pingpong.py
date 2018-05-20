@@ -3,7 +3,7 @@ import logging.config
 
 import curio
 
-from purerpc.service import Service
+from purerpc.service import Service, Server, Stream
 from greeter_pb2 import HelloRequest, HelloReply
 from async_generator import async_generator, yield_
 
@@ -44,14 +44,16 @@ def configure_logs(log_file=None):
 configure_logs()
 
 
-service = Service(50055)
+service = Service("Greeter")
 
 
-@service.rpc("SayHelloToMany", HelloRequest)
+@service.rpc("SayHelloToMany")
 @async_generator
-async def say_hello_to_many(message_iterator):
+async def say_hello_to_many(message: Stream[HelloRequest]) -> Stream[HelloReply]:
     await yield_(HelloReply(message="Hello, world!"))
 
+server = Server(50055)
+server.add_service(service)
 
 if __name__ == "__main__":
-    curio.run(service)
+    server.serve()
