@@ -14,6 +14,7 @@ def main():
         test_suite="tests",
         python_requires=">=3.5.2",
         install_requires=[
+            "autopep8",
             "grpcio_tools",
             "async_generator",
             "h2",
