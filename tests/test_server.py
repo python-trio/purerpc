@@ -8,7 +8,7 @@ import logging.config
 import threading
 from .greeter_pb2 import HelloReply, HelloRequest, GreeterStub
 from async_generator import async_generator, yield_
-from purerpc.service import Service
+from purerpc.server import Service
 
 
 def configure_logs(log_file=None):

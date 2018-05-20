@@ -3,7 +3,7 @@ import logging.config
 
 import curio
 
-from purerpc.service import Service, Server, Stream
+from purerpc.server import Service, Server, Stream
 from greeter_pb2 import HelloRequest, HelloReply
 from async_generator import async_generator, yield_
 
