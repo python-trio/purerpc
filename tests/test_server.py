@@ -8,7 +8,7 @@ import logging.config
 import threading
 from .greeter_pb2 import HelloReply, HelloRequest, GreeterStub
 from async_generator import async_generator, yield_
-from purerpc.server import Service
+from purerpc.server import Service, Stream, Server
 
 
 def configure_logs(log_file=None):
@@ -52,25 +52,28 @@ class TestServer(unittest.TestCase):
         pass
 
     def run_server(self, port):
-        service = Service(port)
+        service = Service("Greeter")
 
-        @service.rpc("SayHelloToMany", HelloRequest)
+        @service.rpc("SayHelloToMany")
         @async_generator
-        async def say_hello_to_many(message_reader):
-            async for message in message_reader:
+        async def say_hello_to_many(messages: Stream[HelloRequest]) -> Stream[HelloReply]:
+            async for message in messages:
                 await curio.sleep(0.05)
                 await yield_(HelloReply(message="Hello " + message.name))
 
-        async def main():
-            await curio.ignore_after(10, service)
+        server = Server(port=port, num_processes=1)
+        server.add_service(service)
 
-        curio.run(main)
+        async def run_server_timeout():
+            await curio.ignore_after(3, server._serve_async)
+
+        curio.run(run_server_timeout)
 
     def test_server(self):
         thread = threading.Thread(target=self.run_server, args=(42419,))
         thread.start()
         try:
-            time.sleep(1.0)
+            time.sleep(0.5)
 
             def name_generator():
                 names = ('Foo', 'Bar', 'Bat', 'Baz')
