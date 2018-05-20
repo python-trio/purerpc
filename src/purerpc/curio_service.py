@@ -93,22 +93,18 @@ class ConnectionHandler:
 
     async def ping_writer(self):
         await self.write_event.set()
-        await curio.sleep(0)
-
-    async def ping_writer_noblock(self):
-        await self.write_event.set()
 
     async def request_received(self, event: RequestReceived):
         self.connection.start_response(event.stream_id, "+proto")
-        await self.ping_writer_noblock()
+        await self.ping_writer()
 
         try:
             async for message in self.service.methods[event.method_name](self.request_message_queue[event.stream_id]):
                 self.connection.send_message(event.stream_id, message)
-                await self.ping_writer_noblock()
+                await self.ping_writer()
 
             self.connection.end_response(event.stream_id, 0)
-            await self.ping_writer_noblock()
+            await self.ping_writer()
         except:
             logging.exception("Got exception while writing response stream")
             self.connection.end_response(event.stream_id, 1, status_message=repr(sys.exc_info()))
@@ -123,31 +119,31 @@ class ConnectionHandler:
         await self.request_message_queue[event.stream_id].put(None)
 
     async def __call__(self, client, addr):
-        print(client)
         self.stream = client
-        try:
-            await curio.spawn(self.stream_writer(), daemon=True)
-            self.connection.initiate_connection()
-            await self.ping_writer_noblock()
+        await curio.spawn(self.stream_writer(), daemon=True)
+        self.connection.initiate_connection()
+        await self.ping_writer()
 
-            try:
-                while True:
-                    data = await client.recv(self.RECEIVE_BUFFER_SIZE)
-                    if not data:
-                        return
-                    events = self.connection.receive_data(data)
-                    for event in events:
-                        if isinstance(event, RequestReceived):
-                            # start RPC thread
-                            self.request_message_queue[event.stream_id] = curio.Queue(10)
-                            await curio.spawn(self.request_received, event, daemon=True)
-                        elif isinstance(event, RequestEnded):
-                            await self.request_ended(event)
-                        elif isinstance(event, MessageReceived):
-                            await self.message_received(event)
-                    await self.ping_writer_noblock()
-            finally:
-                self.write_shutdown = True
+        task_group = curio.TaskGroup()
+        try:
+            while True:
+                data = await client.recv(self.RECEIVE_BUFFER_SIZE)
+                if not data:
+                    return
+                events = self.connection.receive_data(data)
+                for event in events:
+                    if isinstance(event, RequestReceived):
+                        # start RPC thread
+                        self.request_message_queue[event.stream_id] = curio.Queue(10)
+                        await task_group.spawn(self.request_received, event)
+                    elif isinstance(event, RequestEnded):
+                        await self.request_ended(event)
+                    elif isinstance(event, MessageReceived):
+                        await self.message_received(event)
                 await self.ping_writer()
         except:
             logging.exception("Got exception in main dispatch loop")
+        finally:
+            await task_group.join()
+            self.write_shutdown = True
+            await self.ping_writer()

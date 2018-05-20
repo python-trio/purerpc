@@ -16,6 +16,7 @@ def main():
             "trio~=0.3.0",
             "h2~=3.0.1",
             "protobuf",
+            "curio~=0.9.0",
         ],
         tests_require=[
             "grpcio"
