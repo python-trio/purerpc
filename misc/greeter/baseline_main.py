@@ -25,7 +25,7 @@ class Greeter(GreeterServicer):
 
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     add_GreeterServicer_to_server(Greeter(), server)
     server.add_insecure_port('[::]:50055')
     server.start()

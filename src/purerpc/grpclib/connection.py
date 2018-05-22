@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class GRPCConnection:
     def __init__(self, config: GRPCConfiguration):
         self.config = config
-        self.h2_connection = h2.connection.H2Connection(config.h2_config)
+        self.h2_connection = h2.connection.H2Connection(config._h2_config)
         self.message_read_buffers = {}
 
         # if stream_id in this dict, that means that write stream end was requested and the
@@ -136,6 +136,7 @@ class GRPCConnection:
 
     def data_to_send(self, amount: int = None):
         stream_write_pending_remove_flag = []
+        # TODO: computations may be too heavy when repeatedly calling data_to_send with small amount
         for stream_id in self.stream_write_pending:
             num_bytes_to_send = min(self.h2_connection.max_outbound_frame_size,
                                     self.h2_connection.local_flow_control_window(stream_id),
@@ -200,39 +201,24 @@ class GRPCConnection:
 
         return grpc_events
 
+    # API to apply backpressure for send_message
+    def write_buffer_size(self, stream_id: int):
+        if stream_id in self.message_write_buffers:
+            return len(self.message_write_buffers[stream_id])
+        else:
+            return 0
+
     def send_message(self, stream_id: int, message: bytes, compress=False):
-        # TODO: this should apply backpressure if client is receiving too slow
-        """
-        Actually we may implement this method buffered, but then there will be two options:
-        1. Users apply backpressure manually, like this (may be run in multiple threads):
-
-        > grpc_connection.send_message(stream_id, message)
-        > while True:
-        >   data = grpc_connection.data_to_send()
-        >   if not data:
-        >     break
-        >   async with strict_fifo_lock:
-        >     stream.sendall(data)
-
-        This will work if all stream.sendall calls are guarded with lock, which works in strict
-        FIFO order.
-
-        2. If we don't want backpressure, we can spawn separate thread just for writing,
-        communication with this thread should go through special write_event:
-
-        > while True:
-        >   while self.connection.data_to_send() > 0:
-        >      await self.stream.sendall(...)
-        >   await self.write_event.wait()
-
-        """
         self.message_write_buffers[stream_id].write_message(message, compress)
         self.stream_write_pending.add(stream_id)
+
+    def get_next_available_stream_id(self):
+        return self.h2_connection.get_next_available_stream_id()
 
     def start_request(self, stream_id: int, scheme: str, service_name: str, method_name: str,
                       message_type=None, authority=None, timeout: datetime.timedelta=None,
                       content_type_suffix="", custom_metadata=()):
-        self.message_write_buffers[stream_id] = MessageWriteBuffer(self.config.message_encoding)
+        self.message_write_buffers[stream_id] = MessageWriteBuffer(self.config._message_encoding)
         headers = [
             (":method", "POST"),
             (":scheme", scheme),
@@ -255,12 +241,12 @@ class GRPCConnection:
             headers.insert(4, ("grpc-timeout", timeout_str))
         if message_type is not None:
             headers.append(("grpc-message-type", message_type))
-        if self.config.message_encoding is not None:
-            headers.append(("grpc-encoding", self.config.message_encoding))
-        if self.config.message_accept_encoding is not None:
-            headers.append(("grpc-accept-encoding", self.config.message_accept_encoding))
-        if self.config.user_agent is not None:
-            headers.append(("user-agent", self.config.user_agent))
+        if self.config._message_encoding is not None:
+            headers.append(("grpc-encoding", self.config._message_encoding))
+        if self.config._message_accept_encoding is not None:
+            headers.append(("grpc-accept-encoding", self.config._message_accept_encoding))
+        if self.config._user_agent is not None:
+            headers.append(("user-agent", self.config._user_agent))
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def end_request(self, stream_id: int):
@@ -268,16 +254,16 @@ class GRPCConnection:
         self.stream_write_pending.add(stream_id)
 
     def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
-        self.message_write_buffers[stream_id] = MessageWriteBuffer(self.config.message_encoding)
+        self.message_write_buffers[stream_id] = MessageWriteBuffer(self.config._message_encoding)
         headers = [
             (":status", "200"),
             ("content-type", "application/grpc" + content_type_suffix),
             *custom_metadata,
         ]
-        if self.config.message_encoding is not None:
-            headers.append(("grpc-encoding", self.config.message_encoding))
-        if self.config.message_accept_encoding is not None:
-            headers.append(("grpc-accept-encoding", self.config.message_accept_encoding))
+        if self.config._message_encoding is not None:
+            headers.append(("grpc-encoding", self.config._message_encoding))
+        if self.config._message_accept_encoding is not None:
+            headers.append(("grpc-accept-encoding", self.config._message_accept_encoding))
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def end_response(self, stream_id: int, status: int, status_message=None, custom_metadata=()):

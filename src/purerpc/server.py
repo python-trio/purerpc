@@ -8,6 +8,7 @@ import curio
 import typing
 import logging
 
+from purerpc.grpc_socket import GRPCSocket, GRPCStream
 from purerpc.utils import is_linux, get_linux_kernel_version, AClosing
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
@@ -25,17 +26,18 @@ class SerializingCallbackWrapper:
         self.out_type = out_type
 
     @async_generator
-    async def parsing_iterator(self, input_stream: curio.Queue):
-        async for data in input_stream:
-            if data is None:
+    async def parsing_iterator(self, stream: GRPCStream):
+        while True:
+            event = await stream.recv()
+            if isinstance(event, RequestEnded):
                 return
             message = self.in_type()
-            message.ParseFromString(data)
+            message.ParseFromString(event.data)
             await yield_(message)
 
     @async_generator
-    async def __call__(self, input_queue: curio.Queue):
-        input_message_stream = self.parsing_iterator(input_queue)
+    async def __call__(self, stream: GRPCStream):
+        input_message_stream = self.parsing_iterator(stream)
         async with AClosing(self.func(input_message_stream)) as temp:
             async for message in temp:
                 await yield_(message.SerializeToString())
@@ -174,91 +176,35 @@ class ConnectionHandler:
 
     def __init__(self, server: Server):
 
-        config = GRPCConfiguration(client_side=False)
-        self.connection = GRPCConnection(config=config)
+        self.config = GRPCConfiguration(client_side=False)
+        self.grpc_socket = None
         self.server = server
 
-        self.request_message_queue = {}
-
-        self.write_event = curio.Event()
-        self.write_shutdown = False
-        self.stream = None
-
-    async def stream_writer(self):
-        # TODO: this should be the single thread that writes to self.stream, communication with
-        # this thread should go through special event self.write_event
-        # The logic is simple:
-        # while True:
-        #   while self.connection.data_to_send() > 0:
-        #      await self.stream.sendall(...)
-        #   await self.write_event.wait()
-        # TODO: second option: use StrictFIFOLock and write data in the threads that generate it
-        while True:
-            await self.write_event.wait()
-            self.write_event.clear()
-            while True:
-                data = self.connection.data_to_send()
-                if not data:
-                    break
-                await self.stream.sendall(data)
-            if self.write_shutdown:
-                return
-
-    async def ping_writer(self):
-        await self.write_event.set()
-
-    async def request_received(self, event: RequestReceived):
-        self.connection.start_response(event.stream_id, "+proto")
-        await self.ping_writer()
+    async def request_received(self, stream: GRPCStream):
+        await stream.start_response(stream.stream_id, "+proto")
+        event = await stream.recv()
 
         try:
             service = self.server.services[event.service_name]
             method_fn = service.methods[event.method_name]
-            async for message in method_fn(self.request_message_queue[event.stream_id]):
-                self.connection.send_message(event.stream_id, message)
-                await self.ping_writer()
-
-            self.connection.end_response(event.stream_id, 0)
-            await self.ping_writer()
+            async for message in method_fn(stream):
+                await stream.send(message)
+            await stream.close(0)
         except:
             logging.exception("Got exception while writing response stream")
-            self.connection.end_response(event.stream_id, 1, status_message=repr(sys.exc_info()))
-            await self.ping_writer()
-        finally:
-            del self.request_message_queue[event.stream_id]
+            await stream.close(1, status_message=repr(sys.exc_info()))
 
-    async def message_received(self, event: MessageReceived):
-        await self.request_message_queue[event.stream_id].put(event.data)
 
-    async def request_ended(self, event: RequestEnded):
-        await self.request_message_queue[event.stream_id].put(None)
-
-    async def __call__(self, client, addr):
-        self.stream = client
-        await curio.spawn(self.stream_writer(), daemon=True)
-        self.connection.initiate_connection()
-        await self.ping_writer()
+    async def __call__(self, socket, addr):
+        self.grpc_socket = GRPCSocket(self.config, socket)
+        await self.grpc_socket.initiate_connection()
 
         task_group = curio.TaskGroup()
         try:
-            while True:
-                data = await client.recv(self.RECEIVE_BUFFER_SIZE)
-                if not data:
-                    return
-                events = self.connection.receive_data(data)
-                for event in events:
-                    if isinstance(event, RequestReceived):
-                        # start RPC thread
-                        self.request_message_queue[event.stream_id] = curio.Queue(10)
-                        await task_group.spawn(self.request_received, event)
-                    elif isinstance(event, RequestEnded):
-                        await self.request_ended(event)
-                    elif isinstance(event, MessageReceived):
-                        await self.message_received(event)
-                await self.ping_writer()
+            async for stream in self.grpc_socket.listen():
+                await task_group.spawn(self.request_received(stream))
         except:
             logging.exception("Got exception in main dispatch loop")
         finally:
             await task_group.join()
-            self.write_shutdown = True
-            await self.ping_writer()
+            await self.grpc_socket.shutdown()
