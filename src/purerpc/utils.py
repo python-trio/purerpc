@@ -1,4 +1,8 @@
 import platform
+import curio
+import pdb
+import objgraph
+import math
 
 
 def is_linux():
@@ -23,3 +27,14 @@ class AClosing:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._async_gen.aclose()
+
+
+async def print_memory_growth_statistics(interval_sec=10.0, set_pdb_trace_every=math.inf):
+    num_iters = 0
+    while True:
+        num_iters += 1
+        await curio.sleep(interval_sec)
+        objgraph.show_growth()
+        if num_iters == set_pdb_trace_every:
+            pdb.set_trace()
+            num_iters = 0

@@ -83,7 +83,7 @@ class GRPCSocket:
             ended_streams = []
             for stream_id, stream in self._streams.items():
                 while not stream._outgoing_messages.empty():
-                    message = await stream._outgoing_messages.get()
+                    message = stream._outgoing_messages._get()
                     if isinstance(message, StreamClose):
                         if stream.client_side:
                             self._grpc_connection.end_request(stream_id)
@@ -114,23 +114,24 @@ class GRPCSocket:
             for event in events:
                 if isinstance(event, RequestReceived):
                     self._allocate_stream(event.stream_id)
-
                 await self._streams[event.stream_id]._incoming_events.put(event)
 
                 if isinstance(event, RequestReceived):
                     await yield_(self._streams[event.stream_id])
-                elif isinstance(event, ResponseEnded) or isinstance(events, RequestEnded):
+                elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._decref_stream(event.stream_id)
             await self._write_event.set()
 
     async def _listener_thread(self):
-        # TODO: implement client side listening
-        pass
+        async for _ in self._listen():
+            raise ProtocolError("Received request on client end")
 
     async def initiate_connection(self):
         self._grpc_connection.initiate_connection()
         await curio.spawn(self._writer_thread(), daemon=True)
         await self._write_event.set()
+        if self.client_side:
+            await curio.spawn(self._listener_thread(), daemon=True)
 
     async def shutdown(self):
         self._write_shutdown = True

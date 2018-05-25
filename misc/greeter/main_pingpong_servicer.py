@@ -8,7 +8,7 @@ from greeter_pb2 import HelloRequest, HelloReply
 from greeter_grpc import GreeterServicer
 from async_generator import async_generator, yield_
 
-
+"""
 def configure_logs(log_file=None):
     conf = {
         "version": 1,
@@ -43,11 +43,13 @@ def configure_logs(log_file=None):
 
 
 configure_logs()
-
+"""
 
 class Greeter(GreeterServicer):
     @async_generator
     async def SayHelloToMany(self, input_messages):
+        async for _ in input_messages:
+            pass
         await yield_(HelloReply(message="Hello, world!"))
 
 

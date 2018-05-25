@@ -5,7 +5,33 @@ from purerpc.grpclib.config import GRPCConfiguration
 from .grpclib.events import MessageReceived, ResponseReceived, ResponseEnded
 
 
-class Client:
+class StreamWrapper:
+    def __init__(self, stream, in_message_type, out_message_type):
+        self.stream = stream
+        self.in_message_type = in_message_type
+        self.out_message_type = out_message_type
+
+    async def send(self, message):
+        await self.stream.send(message.SerializeToString())
+
+    async def recv(self) -> "Event":
+        event = await self.stream.recv()
+        if isinstance(event, ResponseReceived):
+            return await self.recv()
+        elif isinstance(event, MessageReceived):
+            message = self.out_message_type()
+            message.ParseFromString(event.data)
+            return message
+        elif isinstance(event, ResponseEnded):
+            return None
+        else:
+            raise ValueError("")
+
+    async def close(self):
+        await self.stream.close()
+
+
+class Channel:
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -16,20 +42,20 @@ class Client:
         config = GRPCConfiguration(client_side=True)
         self.grpc_socket = GRPCSocket(config, socket)
         await self.grpc_socket.initiate_connection()
-        await curio.spawn(self._read_thread(), daemon=True)
 
-    async def _read_thread(self):
-        async for event in self.grpc_socket.listen():
-            if isinstance(event, ResponseReceived):
-                pass
-            elif isinstance(event, ResponseEnded):
-                # TODO: put None to queue
-                pass
-            elif isinstance(event, MessageReceived):
-                # TODO: put message in queue
-                pass
 
-    async def send(self, msg):
-        # TODO: create new queue, start sending messages
-        # TODO: wait on queue to recv data
-        pass
+class Stub:
+    def __init__(self, service_name: str, channel: Channel):
+        self.service_name = service_name
+        self.channel = channel
+
+    async def rpc(self, method_name: str, in_message_type, out_message_type):
+        if self.channel.grpc_socket is None:
+            await self.channel.connect()
+        message_type = in_message_type.DESCRIPTOR.full_name
+        stream = await self.channel.grpc_socket.start_request("http", self.service_name,
+                                                              method_name, message_type,
+                                                              "{}:{}".format(self.channel.host,
+                                                                             self.channel.port))
+        return StreamWrapper(stream, in_message_type, out_message_type)
+

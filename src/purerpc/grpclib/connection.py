@@ -5,6 +5,7 @@ import h2.errors
 import h2.events
 import h2.connection
 import h2.exceptions
+from h2.settings import SettingCodes
 
 from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded
@@ -87,7 +88,7 @@ class GRPCConnection:
     def _stream_ended(self, event: h2.events.StreamEnded):
         if event.stream_id in self.message_read_buffers:
             del self.message_read_buffers[event.stream_id]
-            return [RequestEnded(event.stream_id)]
+            return [RequestEnded(event.stream_id)] if not self.config.client_side else []
         return []
 
     def _stream_reset(self, event: h2.events.StreamReset):
@@ -133,6 +134,11 @@ class GRPCConnection:
 
     def initiate_connection(self):
         self.h2_connection.initiate_connection()
+        self.h2_connection.update_settings({
+            SettingCodes.MAX_CONCURRENT_STREAMS: 1000,
+            SettingCodes.INITIAL_WINDOW_SIZE: 128 * 1024,
+            SettingCodes.MAX_FRAME_SIZE: 128 * 1024,
+        })
 
     def data_to_send(self, amount: int = None):
         stream_write_pending_remove_flag = []

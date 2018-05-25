@@ -4,12 +4,15 @@ import inspect
 import warnings
 from multiprocessing import Process
 
+import pdb
 import curio
+import objgraph
 import typing
 import logging
 
 from purerpc.grpc_socket import GRPCSocket, GRPCStream
-from purerpc.utils import is_linux, get_linux_kernel_version, AClosing
+from purerpc.utils import is_linux, get_linux_kernel_version, AClosing, \
+    print_memory_growth_statistics
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import MessageReceived, RequestReceived, RequestEnded
@@ -151,11 +154,12 @@ class Server:
         self.services[service.name] = service
 
     async def _serve_async(self):
+        # await curio.spawn(print_memory_growth_statistics(), daemon=True)
         await curio.tcp_server('', self.port, lambda c, a: ConnectionHandler(self)(c, a),
                                reuse_address=True, reuse_port=True)
 
     def _target_fn(self):
-        curio.run(self._serve_async)
+        curio.run(self._serve_async, with_monitor=True)
 
     def serve(self):
         if self.num_processes == 1:
@@ -199,12 +203,14 @@ class ConnectionHandler:
         self.grpc_socket = GRPCSocket(self.config, socket)
         await self.grpc_socket.initiate_connection()
 
-        task_group = curio.TaskGroup()
+        # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
+        # TODO: do we really need it here?
+        # task_group = curio.TaskGroup()
         try:
             async for stream in self.grpc_socket.listen():
-                await task_group.spawn(self.request_received(stream))
+                await curio.spawn(self.request_received(stream), daemon=True)
         except:
             logging.exception("Got exception in main dispatch loop")
         finally:
-            await task_group.join()
+            # await task_group.join()
             await self.grpc_socket.shutdown()
