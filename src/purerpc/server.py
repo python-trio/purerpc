@@ -6,6 +6,7 @@ from multiprocessing import Process
 
 import pdb
 import curio
+import curio.meta
 import typing
 import logging
 
@@ -37,7 +38,7 @@ class SerializingCallbackWrapper:
 
     async def __call__(self, stream: GRPCStream):
         input_message_stream = self.parsing_iterator(stream)
-        async with AClosing(self.func(input_message_stream)) as temp:
+        async with curio.meta.finalize(self.func(input_message_stream)) as temp:
             async for message in temp:
                 yield message.SerializeToString()
 
@@ -185,8 +186,9 @@ class ConnectionHandler:
         try:
             service = self.server.services[event.service_name]
             method_fn = service.methods[event.method_name]
-            async for message in method_fn(stream):
-                await stream.send(message)
+            async with curio.meta.finalize(method_fn(stream)) as agen:
+                async for message in agen:
+                    await stream.send(message)
             await stream.close(0)
         except:
             logging.exception("Got exception while writing response stream")
