@@ -6,7 +6,6 @@ from multiprocessing import Process
 
 import pdb
 import curio
-import objgraph
 import typing
 import logging
 
@@ -16,7 +15,6 @@ from purerpc.utils import is_linux, get_linux_kernel_version, AClosing, \
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import MessageReceived, RequestReceived, RequestEnded
-from async_generator import async_generator, yield_
 
 
 Stream = typing.AsyncIterator
@@ -28,7 +26,6 @@ class SerializingCallbackWrapper:
         self.in_type = in_type
         self.out_type = out_type
 
-    @async_generator
     async def parsing_iterator(self, stream: GRPCStream):
         while True:
             event = await stream.recv()
@@ -36,14 +33,13 @@ class SerializingCallbackWrapper:
                 return
             message = self.in_type()
             message.ParseFromString(event.data)
-            await yield_(message)
+            yield message
 
-    @async_generator
     async def __call__(self, stream: GRPCStream):
         input_message_stream = self.parsing_iterator(stream)
         async with AClosing(self.func(input_message_stream)) as temp:
             async for message in temp:
-                await yield_(message.SerializeToString())
+                yield message.SerializeToString()
 
 
 class Service:
@@ -53,7 +49,6 @@ class Service:
 
     def add_unary_unary(self, name, func, in_type, out_type):
         print("Call unary_unary")
-        @async_generator
         async def wrapper(input_stream):
             message = None
             async for elem in input_stream:
@@ -63,12 +58,11 @@ class Service:
                 else:
                     message = elem
             result = await func(message)
-            await yield_(result)
+            yield result
         self.add_stream_stream(name, wrapper, in_type, out_type)
 
     def add_unary_stream(self, name, func, in_type, out_type):
         print("Call unary_stream")
-        @async_generator
         async def wrapper(input_stream):
             message = None
             async for elem in input_stream:
@@ -78,15 +72,14 @@ class Service:
                 else:
                     message = elem
             async for result in func(message):
-                await yield_(result)
+                yield result
         self.add_stream_stream(name, wrapper, in_type, out_type)
 
     def add_stream_unary(self, name, func, in_type, out_type):
         print("Call stream_unary")
-        @async_generator
         async def wrapper(input_stream):
             result = await func(input_stream)
-            await yield_(result)
+            yield result
         self.add_stream_stream(name, wrapper, in_type, out_type)
 
     def add_stream_stream(self, name, func, in_type, out_type):
@@ -188,6 +181,7 @@ class ConnectionHandler:
         await stream.start_response(stream.stream_id, "+proto")
         event = await stream.recv()
 
+        # TODO: Should at least pass through GeneratorExit
         try:
             service = self.server.services[event.service_name]
             method_fn = service.methods[event.method_name]
@@ -206,6 +200,7 @@ class ConnectionHandler:
         # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
         # TODO: do we really need it here?
         # task_group = curio.TaskGroup()
+        # TODO: Should at least pass through GeneratorExit
         try:
             async for stream in self.grpc_socket.listen():
                 await curio.spawn(self.request_received(stream), daemon=True)

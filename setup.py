@@ -1,3 +1,5 @@
+import faulthandler
+faulthandler.enable()
 from setuptools import setup, find_packages
 
 
@@ -12,11 +14,11 @@ def main():
         packages=find_packages('src'),
         package_dir={'': 'src'},
         test_suite="tests",
-        python_requires=">=3.5.2",
+        python_requires=">=3.6.0",
         install_requires=[
             "autopep8",
             "grpcio_tools",
-            "async_generator",
+            "objgraph",
             "h2",
             "protobuf",
             "curio~=0.9.0",

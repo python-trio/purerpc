@@ -5,7 +5,6 @@ import curio
 
 from purerpc.server import Server, Service, Stream
 from greeter_pb2 import HelloRequest, HelloReply
-from async_generator import async_generator, yield_
 
 
 def configure_logs(log_file=None):
@@ -48,7 +47,6 @@ service = Service("Greeter")
 
 
 @service.rpc("SayHelloToMany")
-@async_generator
 async def say_hello_to_many(message_iterator: Stream[HelloRequest]) -> Stream[HelloReply]:
     requests = []
     async for message in message_iterator:
@@ -57,7 +55,7 @@ async def say_hello_to_many(message_iterator: Stream[HelloRequest]) -> Stream[He
     name = requests[0].name
     for i in range(8):
         name += name
-    await yield_(HelloReply(message="Hello, {}".format(name)))
+    yield HelloReply(message="Hello, {}".format(name))
 
 server = Server(port=50055)
 server.add_service(service)

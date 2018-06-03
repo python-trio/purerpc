@@ -2,7 +2,6 @@ import curio
 import curio.io
 import datetime
 import collections
-from async_generator import async_generator, yield_
 from purerpc.grpclib.exceptions import ProtocolError
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
@@ -104,7 +103,6 @@ class GRPCSocket:
             if self._write_shutdown:
                 return
 
-    @async_generator
     async def _listen(self):
         while True:
             data = await self._socket.recv(self._receive_buffer_size)
@@ -117,7 +115,7 @@ class GRPCSocket:
                 await self._streams[event.stream_id]._incoming_events.put(event)
 
                 if isinstance(event, RequestReceived):
-                    await yield_(self._streams[event.stream_id])
+                    yield self._streams[event.stream_id]
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._decref_stream(event.stream_id)
             await self._write_event.set()
@@ -137,12 +135,11 @@ class GRPCSocket:
         self._write_shutdown = True
         await self._write_event.set()
 
-    @async_generator
     async def listen(self):
         if self.client_side:
             raise ValueError("Cannot listen client-side socket")
         async for stream in self._listen():
-            await yield_(stream)
+            yield stream
 
     async def _start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
         self._grpc_connection.start_response(stream_id, content_type_suffix, custom_metadata)

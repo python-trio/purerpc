@@ -29,9 +29,6 @@ async def main_coro():
         print("RPS: {}".format(10000 / (time.time() - start)))
 
 
-
-
-
 def main():
     curio.run(main_coro)
 
