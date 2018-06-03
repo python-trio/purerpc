@@ -5,8 +5,7 @@ import collections
 from purerpc.grpclib.exceptions import ProtocolError
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
-from .grpclib.events import (
-    RequestReceived, RequestEnded, MessageReceived, ResponseReceived, ResponseEnded)
+from .grpclib.events import RequestReceived, RequestEnded, ResponseEnded
 
 
 StreamClose = collections.namedtuple("StreamClose", ["status", "status_message", "custom_metadata"])

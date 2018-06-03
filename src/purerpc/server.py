@@ -1,21 +1,18 @@
-import collections
 import sys
 import inspect
 import warnings
 from multiprocessing import Process
 
-import pdb
 import curio
 import curio.meta
 import typing
 import logging
 
 from purerpc.grpc_socket import GRPCSocket, GRPCStream
-from purerpc.utils import is_linux, get_linux_kernel_version, AClosing, \
-    print_memory_growth_statistics
+from purerpc.utils import is_linux, get_linux_kernel_version
 
-from .grpclib.connection import GRPCConfiguration, GRPCConnection
-from .grpclib.events import MessageReceived, RequestReceived, RequestEnded
+from .grpclib.connection import GRPCConfiguration
+from .grpclib.events import RequestEnded
 
 
 Stream = typing.AsyncIterator

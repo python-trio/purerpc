@@ -1,6 +1,5 @@
 import curio
 from purerpc.grpc_socket import GRPCSocket
-from purerpc.grpclib.connection import GRPCConnection
 from purerpc.grpclib.config import GRPCConfiguration
 from .grpclib.events import MessageReceived, ResponseReceived, ResponseEnded
 
