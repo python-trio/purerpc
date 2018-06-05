@@ -88,8 +88,18 @@ class ClientStubStreamUnary(ClientStub):
 
 
 class ClientStubStreamStream(ClientStub):
-    async def __call__(self, message_aiter=None):
+    async def call_aiter(self, message_aiter):
         stream = await self._stream_fn()
-        await curio.spawn(send_multiple_messages_finalize, stream, message_aiter, daemon=True)
-        async for message in stream_to_async_iterator(stream):
-            yield message
+        if message_aiter is not None:
+            await curio.spawn(send_multiple_messages_finalize, stream, message_aiter, daemon=True)
+            async for message in stream_to_async_iterator(stream):
+                yield message
+
+    async def call_stream(self):
+        return await self._stream_fn()
+
+    def __call__(self, message_aiter=None):
+        if message_aiter is None:
+            return self.call_stream()
+        else:
+            return self.call_aiter(message_aiter)
