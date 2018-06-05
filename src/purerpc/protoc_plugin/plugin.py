@@ -5,14 +5,12 @@ import autopep8
 from google.protobuf.compiler.plugin_pb2 import CodeGeneratorRequest
 from google.protobuf.compiler.plugin_pb2 import CodeGeneratorResponse
 from google.protobuf import descriptor_pb2
+from purerpc.rpc import Cardinality
 
 IMPORT_STRINGS = """import purerpc.server
-from async_generator import async_generator
+import purerpc.client
+from purerpc.rpc import Cardinality, RPCSignature
 """
-
-
-def get_cardinality_string(is_streaming):
-    return "stream" if is_streaming else "unary"
 
 
 def get_python_package(proto_name):
@@ -35,8 +33,6 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto):
     for service in proto_file.service:
         contents += "\n\nclass {}Servicer(purerpc.server.Servicer):\n".format(service.name)
         for method in service.method:
-            if method.server_streaming:
-                contents += "    @async_generator\n"
             contents += "    async def {}(self, input_message{}):\n".format(method.name,
                                                                     "s" if
                                                                     method.client_streaming else "")
@@ -45,16 +41,30 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto):
         contents += "    def service(self) -> purerpc.server.Service:\n"
         contents += "        service_obj = purerpc.server.Service(\"{}\")\n".format(service.name)
         for method in service.method:
-            service_method_name = "_".join([
-                "add",
-                get_cardinality_string(method.client_streaming),
-                get_cardinality_string(method.server_streaming)
-            ])
-            contents += "        service_obj.{}(\"{}\", self.{}, {}, {})\n".format(
-                service_method_name, method.name, method.name,
+            cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
+                                                          response_stream=method.server_streaming)
+            contents += ("        service_obj.add_method(\"{}\", self.{}, "
+                         "RPCSignature({}, {}, {}))\n".format(
+                method.name, method.name, cardinality,
                 get_python_type(proto_file.name, method.input_type),
-                get_python_type(proto_file.name, method.output_type))
-        contents += "        return service_obj\n"
+                get_python_type(proto_file.name, method.output_type)))
+        contents += "        return service_obj\n\n\n"
+
+        contents += "class {}Stub:\n".format(service.name)
+        contents += "    def __init__(self, channel):\n"
+        contents += "        self._stub = purerpc.client.Stub(\"{}\", channel)\n".format(
+            service.name)
+        for method in service.method:
+            cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
+                                                          response_stream=method.server_streaming)
+            contents += ("        self.{} = self._stub.get_method_stub("
+                         "\"{}\", RPCSignature({}, {}, {}))\n".format(
+                method.name, method.name, cardinality,
+                get_python_type(proto_file.name, method.input_type),
+                get_python_type(proto_file.name, method.output_type)
+            ))
+        contents += "\n\n"
+
     return autopep8.fix_code(contents, options={"experimental": True, "max_line_length": 100})
 
 

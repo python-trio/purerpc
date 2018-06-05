@@ -1,33 +1,10 @@
 import curio
-from purerpc.grpc_socket import GRPCSocket
+from purerpc.grpc_proto import GRPCProtoSocket
+import functools
 from purerpc.grpclib.config import GRPCConfiguration
-from .grpclib.events import MessageReceived, ResponseReceived, ResponseEnded
-
-
-class StreamWrapper:
-    def __init__(self, stream, in_message_type, out_message_type):
-        self.stream = stream
-        self.in_message_type = in_message_type
-        self.out_message_type = out_message_type
-
-    async def send(self, message):
-        await self.stream.send(message.SerializeToString())
-
-    async def recv(self) -> "Event":
-        event = await self.stream.recv()
-        if isinstance(event, ResponseReceived):
-            return await self.recv()
-        elif isinstance(event, MessageReceived):
-            message = self.out_message_type()
-            message.ParseFromString(event.data)
-            return message
-        elif isinstance(event, ResponseEnded):
-            return None
-        else:
-            raise ValueError("")
-
-    async def close(self):
-        await self.stream.close()
+from purerpc.rpc import RPCSignature, Cardinality
+from purerpc.wrappers import ClientStubUnaryUnary, ClientStubStreamStream, ClientStubUnaryStream, \
+    ClientStubStreamUnary
 
 
 class Channel:
@@ -39,7 +16,7 @@ class Channel:
     async def connect(self):
         socket = await curio.open_connection(self.host, self.port)
         config = GRPCConfiguration(client_side=True)
-        self.grpc_socket = GRPCSocket(config, socket)
+        self.grpc_socket = GRPCProtoSocket(config, socket)
         await self.grpc_socket.initiate_connection()
 
 
@@ -48,13 +25,25 @@ class Stub:
         self.service_name = service_name
         self.channel = channel
 
-    async def rpc(self, method_name: str, in_message_type, out_message_type):
+    async def rpc(self, method_name: str, request_type, response_type):
         if self.channel.grpc_socket is None:
             await self.channel.connect()
-        message_type = in_message_type.DESCRIPTOR.full_name
+        message_type = request_type.DESCRIPTOR.full_name
         stream = await self.channel.grpc_socket.start_request("http", self.service_name,
                                                               method_name, message_type,
                                                               "{}:{}".format(self.channel.host,
                                                                              self.channel.port))
-        return StreamWrapper(stream, in_message_type, out_message_type)
+        stream.expect_message_type(response_type)
+        return stream
 
+    def get_method_stub(self, method_name: str, signature: RPCSignature):
+        stream_fn = functools.partial(self.rpc, method_name, signature.request_type,
+                                      signature.response_type)
+        if signature.cardinality == Cardinality.STREAM_STREAM:
+            return ClientStubStreamStream(stream_fn)
+        elif signature.cardinality == Cardinality.UNARY_STREAM:
+            return ClientStubUnaryStream(stream_fn)
+        elif signature.cardinality == Cardinality.STREAM_UNARY:
+            return ClientStubStreamUnary(stream_fn)
+        else:
+            return ClientStubUnaryUnary(stream_fn)

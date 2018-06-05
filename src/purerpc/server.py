@@ -1,6 +1,7 @@
 import sys
 import inspect
 import warnings
+import collections
 from multiprocessing import Process
 
 import curio
@@ -8,36 +9,17 @@ import curio.meta
 import typing
 import logging
 
+from purerpc.grpc_proto import GRPCProtoStream, GRPCProtoSocket
 from purerpc.grpc_socket import GRPCSocket, GRPCStream
+from purerpc.rpc import RPCSignature, Cardinality
 from purerpc.utils import is_linux, get_linux_kernel_version
+from purerpc.wrappers import stream_to_async_iterator, call_server_unary_unary, \
+    call_server_unary_stream, call_server_stream_unary, call_server_stream_stream
 
 from .grpclib.connection import GRPCConfiguration
-from .grpclib.events import RequestEnded
 
 
-Stream = typing.AsyncIterator
-
-
-class SerializingCallbackWrapper:
-    def __init__(self, func, in_type, out_type):
-        self.func = func
-        self.in_type = in_type
-        self.out_type = out_type
-
-    async def parsing_iterator(self, stream: GRPCStream):
-        while True:
-            event = await stream.recv()
-            if isinstance(event, RequestEnded):
-                return
-            message = self.in_type()
-            message.ParseFromString(event.data)
-            yield message
-
-    async def __call__(self, stream: GRPCStream):
-        input_message_stream = self.parsing_iterator(stream)
-        async with curio.meta.finalize(self.func(input_message_stream)) as temp:
-            async for message in temp:
-                yield message.SerializeToString()
+BoundRPCMethod = collections.namedtuple("BoundRPCMethod", ["method_fn", "signature"])
 
 
 class Service:
@@ -45,44 +27,8 @@ class Service:
         self.name = name
         self.methods = {}
 
-    def add_unary_unary(self, name, func, in_type, out_type):
-        print("Call unary_unary")
-        async def wrapper(input_stream):
-            message = None
-            async for elem in input_stream:
-                if message is not None:
-                    # TODO: raise meaningful error
-                    raise RuntimeError("Got multiple messages on unary stream")
-                else:
-                    message = elem
-            result = await func(message)
-            yield result
-        self.add_stream_stream(name, wrapper, in_type, out_type)
-
-    def add_unary_stream(self, name, func, in_type, out_type):
-        print("Call unary_stream")
-        async def wrapper(input_stream):
-            message = None
-            async for elem in input_stream:
-                if message is not None:
-                    # TODO: raise meaningful error
-                    raise RuntimeError("Got multiple messages on unary stream")
-                else:
-                    message = elem
-            async for result in func(message):
-                yield result
-        self.add_stream_stream(name, wrapper, in_type, out_type)
-
-    def add_stream_unary(self, name, func, in_type, out_type):
-        print("Call stream_unary")
-        async def wrapper(input_stream):
-            result = await func(input_stream)
-            yield result
-        self.add_stream_stream(name, wrapper, in_type, out_type)
-
-    def add_stream_stream(self, name, func, in_type, out_type):
-        print("Call stream_stream")
-        self.methods[name] = SerializingCallbackWrapper(func, in_type, out_type)
+    def add_method(self, method_name: str, method_fn, rpc_signature: RPCSignature):
+        self.methods[method_name] = BoundRPCMethod(method_fn, rpc_signature)
 
     def rpc(self, method_name):
         def decorator(func):
@@ -96,33 +42,9 @@ class Service:
             if parameter.annotation == parameter.empty:
                 raise ValueError("Only annotated methods can be used with Service.rpc() decorator")
 
-            in_annotation = parameter.annotation
-            out_annotation = signature.return_annotation
-
-            if issubclass(in_annotation, Stream):
-                in_type = in_annotation.__args__[0]
-                in_stream = True
-            else:
-                in_type = in_annotation
-                in_stream = False
-
-            if issubclass(out_annotation, Stream):
-                out_type = out_annotation.__args__[0]
-                out_stream = True
-            else:
-                out_type = out_annotation
-                out_stream = False
-
-            param_tuple = (method_name, func, in_type, out_type)
-            if in_stream and out_stream:
-                self.add_stream_stream(*param_tuple)
-            elif in_stream and not out_stream:
-                self.add_stream_unary(*param_tuple)
-            elif not in_stream and out_stream:
-                self.add_unary_stream(*param_tuple)
-            else:
-                self.add_unary_unary(*param_tuple)
-
+            rpc_signature = RPCSignature.from_annotations(parameter.annotation,
+                                                          signature.return_annotation)
+            self.add_method(method_name, func, rpc_signature)
             return func
         return decorator
 
@@ -170,30 +92,35 @@ class ConnectionHandler:
     RECEIVE_BUFFER_SIZE = 65536
 
     def __init__(self, server: Server):
-
         self.config = GRPCConfiguration(client_side=False)
         self.grpc_socket = None
         self.server = server
 
-    async def request_received(self, stream: GRPCStream):
+    async def request_received(self, stream: GRPCProtoStream):
         await stream.start_response(stream.stream_id, "+proto")
-        event = await stream.recv()
+        event = await stream.receive_event()
 
         # TODO: Should at least pass through GeneratorExit
         try:
             service = self.server.services[event.service_name]
-            method_fn = service.methods[event.method_name]
-            async with curio.meta.finalize(method_fn(stream)) as agen:
-                async for message in agen:
-                    await stream.send(message)
-            await stream.close(0)
+            bound_rpc_method = service.methods[event.method_name]
+            method_fn = bound_rpc_method.method_fn
+            cardinality = bound_rpc_method.signature.cardinality
+            stream.expect_message_type(bound_rpc_method.signature.request_type)
+            if cardinality == Cardinality.STREAM_STREAM:
+                await call_server_stream_stream(method_fn, stream)
+            elif cardinality == Cardinality.UNARY_STREAM:
+                await call_server_unary_stream(method_fn, stream)
+            elif cardinality == Cardinality.STREAM_UNARY:
+                await call_server_stream_unary(method_fn, stream)
+            else:
+                await call_server_unary_unary(method_fn, stream)
         except:
             logging.exception("Got exception while writing response stream")
             await stream.close(1, status_message=repr(sys.exc_info()))
 
-
     async def __call__(self, socket, addr):
-        self.grpc_socket = GRPCSocket(self.config, socket)
+        self.grpc_socket = GRPCProtoSocket(self.config, socket)
         await self.grpc_socket.initiate_connection()
 
         # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time

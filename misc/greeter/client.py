@@ -2,19 +2,15 @@ import curio
 import time
 from purerpc.client import Channel, Stub
 from greeter_pb2 import HelloRequest, HelloReply
+from greeter_grpc import GreeterStub
 from purerpc.utils import print_memory_growth_statistics
 
 
 async def worker(channel):
-    stub = Stub("Greeter", channel)
+    stub = GreeterStub(channel)
     for i in range(100):
-        stream = await stub.rpc("SayHelloToMany", HelloRequest, HelloReply)
-        await stream.send(HelloRequest(name="Hi, beyotch"))
-        await stream.close()
-        while True:
-            msg = await stream.recv()
-            if msg is None:
-                break
+        response = await stub.SayHello(HelloRequest(name="World"))
+        assert(response.message == "Hello, World")
 
 
 async def main_coro():

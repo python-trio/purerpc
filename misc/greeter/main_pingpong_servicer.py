@@ -3,7 +3,8 @@ import logging.config
 
 import curio
 
-from purerpc.server import Service, Server, Stream
+from purerpc.server import Service, Server
+from purerpc.rpc import Stream
 from greeter_pb2 import HelloRequest, HelloReply
 from greeter_grpc import GreeterServicer
 
@@ -44,7 +45,11 @@ def configure_logs(log_file=None):
 configure_logs()
 """
 
+
 class Greeter(GreeterServicer):
+    async def SayHello(self, message):
+        return HelloReply(message="Hello, " + message.name)
+
     async def SayHelloToMany(self, input_messages):
         async for _ in input_messages:
             pass

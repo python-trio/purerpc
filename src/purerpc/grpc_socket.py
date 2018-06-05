@@ -28,17 +28,17 @@ class GRPCStream:
     def client_side(self):
         return self._client_side
 
-    async def send(self, message):
+    async def send_message(self, message):
         await self._outgoing_messages.put(message)
         await self._socket._write_event.set()
 
-    async def recv(self) -> "Event":
+    async def receive_event(self):
         return await self._incoming_events.get()
 
     async def close(self, status=None, status_message=None, custom_metadata=()):
         if self._client_side and (status or status_message or custom_metadata):
             raise ValueError("Client side streams cannot be closed with non-default arguments")
-        await self.send(StreamClose(status, status_message, custom_metadata))
+        await self.send_message(StreamClose(status, status_message, custom_metadata))
 
     async def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
         if self._client_side:
@@ -62,8 +62,11 @@ class GRPCSocket:
     def client_side(self):
         return self._grpc_connection.config.client_side
 
+    def _stream_ctor(self, stream_id):
+        return GRPCStream(self, stream_id, self.client_side)
+
     def _allocate_stream(self, stream_id):
-        stream = GRPCStream(self, stream_id, self.client_side)
+        stream = self._stream_ctor(stream_id)
         self._streams[stream_id] = stream
         self._streams_count[stream_id] = 2
         return stream
@@ -156,4 +159,3 @@ class GRPCSocket:
                                             content_type_suffix, custom_metadata)
         await self._write_event.set()
         return stream
-
