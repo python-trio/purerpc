@@ -2,8 +2,14 @@ import unittest
 import threading
 import multiprocessing
 import curio
+import subprocess
 import purerpc
+import tempfile
+import shutil
 import grpc
+import os
+import sys
+import importlib
 import concurrent.futures
 import logging
 import logging.config
@@ -52,6 +58,26 @@ class PureRPCTestCase(unittest.TestCase):
         finally:
             process.terminate()
             process.join()
+
+    @contextlib.contextmanager
+    def compile_temp_proto(self, proto_path):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            proto_filename = os.path.basename(proto_path)
+            proto_temp_path = os.path.join(temp_dir, proto_filename)
+            shutil.copyfile(proto_path, proto_temp_path)
+            cmdline = [sys.executable, '-m', 'grpc_tools.protoc', '--python_out=.',
+                       '--purerpc_out=.', f'-I{temp_dir}', proto_temp_path]
+            subprocess.check_call(cmdline, cwd=temp_dir)
+            sys.path.insert(0, temp_dir)
+            pb2_module_name = proto_filename.replace(".proto", "_pb2")
+            grpc_module_name = proto_filename.replace(".proto", "_grpc")
+            try:
+                pb2_module = importlib.import_module(pb2_module_name)
+                grpc_module = importlib.import_module(grpc_module_name)
+                yield pb2_module, grpc_module
+            finally:
+                sys.path.remove(temp_dir)
+
 
     def setUp(self):
         self.configure_logs()
