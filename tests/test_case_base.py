@@ -60,7 +60,8 @@ class PureRPCTestCase(unittest.TestCase):
             process.join()
 
     @contextlib.contextmanager
-    def compile_temp_proto(self, proto_path):
+    def compile_temp_proto(self, proto_path_relative):
+        proto_path = os.path.join(os.path.dirname(__file__), proto_path_relative)
         with tempfile.TemporaryDirectory() as temp_dir:
             proto_filename = os.path.basename(proto_path)
             proto_temp_path = os.path.join(temp_dir, proto_filename)

@@ -7,8 +7,7 @@ from .test_case_base import PureRPCTestCase
 
 class TestClientServerSimple(PureRPCTestCase):
     def test_plugin(self):
-        proto_path = os.path.join(os.path.dirname(__file__), 'data', 'greeter.proto')
-        with self.compile_temp_proto(proto_path) as (_, grpc_module):
+        with self.compile_temp_proto('data/greeter.proto') as (_, grpc_module):
             self.assertIn("GreeterServicer", dir(grpc_module))
             self.assertIn("GreeterStub", dir(grpc_module))
 
