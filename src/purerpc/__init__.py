@@ -1,4 +1,3 @@
-from purerpc.client import Channel, Stub
-from purerpc.server import Server, Service
-from purerpc.rpc import Cardinality, RPCSignature
-
+from purerpc.client import Channel, Client
+from purerpc.server import Service, Server
+from purerpc.rpc import Cardinality, RPCSignature, Stream

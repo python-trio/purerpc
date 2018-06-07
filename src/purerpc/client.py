@@ -20,7 +20,7 @@ class Channel:
         await self.grpc_socket.initiate_connection()
 
 
-class Stub:
+class Client:
     def __init__(self, service_name: str, channel: Channel):
         self.service_name = service_name
         self.channel = channel

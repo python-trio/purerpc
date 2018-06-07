@@ -52,12 +52,12 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto):
 
         contents += "class {}Stub:\n".format(service.name)
         contents += "    def __init__(self, channel):\n"
-        contents += "        self._stub = purerpc.client.Stub(\"{}\", channel)\n".format(
+        contents += "        self._client = purerpc.client.Client(\"{}\", channel)\n".format(
             service.name)
         for method in service.method:
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
-            contents += ("        self.{} = self._stub.get_method_stub("
+            contents += ("        self.{} = self._client.get_method_stub("
                          "\"{}\", RPCSignature({}, {}, {}))\n".format(
                 method.name, method.name, cardinality,
                 get_python_type(proto_file.name, method.input_type),

@@ -66,13 +66,15 @@ class Server:
     def add_service(self, service):
         self.services[service.name] = service
 
-    async def _serve_async(self):
-        # await curio.spawn(print_memory_growth_statistics(), daemon=True)
-        await curio.tcp_server('', self.port, lambda c, a: ConnectionHandler(self)(c, a),
-                               reuse_address=True, reuse_port=True)
+    def _create_socket_and_listen(self):
+        return curio.tcp_server_socket('', self.port, reuse_address=True, reuse_port=True)
+
+    async def _run_async_server(self, socket):
+        await curio.network.run_server(socket, lambda c, a: ConnectionHandler(self)(c, a))
 
     def _target_fn(self):
-        curio.run(self._serve_async, with_monitor=True)
+        socket = self._create_socket_and_listen()
+        curio.run(self._run_async_server, socket, with_monitor=True)
 
     def serve(self):
         if self.num_processes == 1:

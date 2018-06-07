@@ -3,7 +3,7 @@ import logging.config
 
 import curio
 
-from purerpc.server import Server, Service, Stream
+from purerpc import Server, Service, Stream
 from greeter_pb2 import HelloRequest, HelloReply
 
 
