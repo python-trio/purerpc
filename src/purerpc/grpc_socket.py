@@ -48,7 +48,7 @@ class GRPCStream:
 
 class GRPCSocket:
     def __init__(self, config: GRPCConfiguration, socket: curio.io.Socket,
-                 receive_buffer_size=65536):
+                 receive_buffer_size=262144):
         self._grpc_connection = GRPCConnection(config=config)
         self._write_event = curio.Event()
         self._write_shutdown = False

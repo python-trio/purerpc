@@ -40,25 +40,29 @@ class TestClientServerCodegen(PureRPCTestCase):
                     for name in names:
                         yield HelloRequest(name=name)
 
-                with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
-                    stub = GreeterStub(channel)
-                    self.assertEqual(
-                        stub.SayHello(HelloRequest(name="World")).message,
-                        "Hello, World"
-                    )
-                    self.assertEqual(
-                        [response.message for response in
-                            stub.SayHelloGoodbye(HelloRequest(name="World"))],
-                        ["Hello, World", "Goodbye, World"]
-                    )
-                    self.assertEqual(
-                        stub.SayHelloToManyAtOnce(name_generator()).message,
-                        "Hello, Foo, Bar, Bat, Baz"
-                    )
-                    self.assertEqual(
-                        [response.message for response in stub.SayHelloToMany(name_generator())],
-                        ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
-                    )
+                def target_fn():
+                    with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
+                        stub = GreeterStub(channel)
+                        self.assertEqual(
+                            stub.SayHello(HelloRequest(name="World")).message,
+                            "Hello, World"
+                        )
+                        self.assertEqual(
+                            [response.message for response in
+                                stub.SayHelloGoodbye(HelloRequest(name="World"))],
+                            ["Hello, World", "Goodbye, World"]
+                        )
+                        self.assertEqual(
+                            stub.SayHelloToManyAtOnce(name_generator()).message,
+                            "Hello, Foo, Bar, Bat, Baz"
+                        )
+                        self.assertEqual(
+                            [response.message for response
+                                in stub.SayHelloToMany(name_generator())],
+                            ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
+                        )
+
+                self.run_tests_in_workers(target=target_fn, num_workers=50)
 
     def test_grpc_server_purerpc_client(self):
         class Servicer(GreeterServicer):
@@ -115,7 +119,7 @@ class TestClientServerCodegen(PureRPCTestCase):
                 channel = Channel("localhost", port)
                 await channel.connect()
                 async with curio.TaskGroup() as task_group:
-                    for _ in range(5):
+                    for _ in range(50):
                         await task_group.spawn(worker(channel))
             curio.run(main)
 
@@ -174,7 +178,80 @@ class TestClientServerCodegen(PureRPCTestCase):
                     channel = Channel("localhost", port)
                     await channel.connect()
                     async with curio.TaskGroup() as task_group:
-                        for _ in range(5):
+                        for _ in range(50):
                             await task_group.spawn(worker(channel))
 
                 curio.run(main)
+
+    def test_purerpc_server_purerpc_client_large_payload_many_streams(self):
+        with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
+            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+            GreeterStub = getattr(grpc_module, "GreeterStub")
+
+            class Servicer(GreeterServicer):
+                async def SayHello(self, message):
+                    return HelloReply(message=f"Hello, {message.name}")
+
+            with self.run_purerpc_service_in_process(Servicer().service) as port:
+                async def worker(channel):
+                    stub = GreeterStub(channel)
+                    data = "World" * 20000
+                    self.assertEqual(
+                        (await stub.SayHello(HelloRequest(name=data))).message,
+                        "Hello, " + data
+                    )
+
+                async def main():
+                    channel = Channel("localhost", port)
+                    await channel.connect()
+                    async with curio.TaskGroup() as task_group:
+                        for _ in range(50):
+                            await task_group.spawn(worker(channel))
+
+                curio.run(main)
+
+    def test_purerpc_server_purerpc_client_large_payload_one_stream(self):
+        with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
+            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+            GreeterStub = getattr(grpc_module, "GreeterStub")
+
+            class Servicer(GreeterServicer):
+                async def SayHello(self, message):
+                    return HelloReply(message=f"Hello, {message.name}")
+
+            with self.run_purerpc_service_in_process(Servicer().service) as port:
+                async def worker(channel):
+                    stub = GreeterStub(channel)
+                    data = "World" * 20000
+                    self.assertEqual(
+                        (await stub.SayHello(HelloRequest(name=data))).message,
+                        "Hello, " + data
+                    )
+
+                async def main():
+                    channel = Channel("localhost", port)
+                    await channel.connect()
+                    async with curio.TaskGroup() as task_group:
+                        for _ in range(1):
+                            await task_group.spawn(worker(channel))
+
+                curio.run(main)
+
+    def test_purerpc_server_grpc_client_large_payload(self):
+        with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
+            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+
+            class Servicer(GreeterServicer):
+                async def SayHello(self, message):
+                    return HelloReply(message=f"Hello, {message.name}")
+
+            with self.run_purerpc_service_in_process(Servicer().service) as port:
+                def target_fn():
+                    with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
+                        stub = GreeterStub(channel)
+                        data = "World" * 20000
+                        self.assertEqual(
+                            stub.SayHello(HelloRequest(name=data)).message,
+                            "Hello, " + data
+                        )
+                self.run_tests_in_workers(target=target_fn, num_workers=50)

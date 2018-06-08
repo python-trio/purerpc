@@ -33,7 +33,7 @@ class GreeterServicer(purerpc.server.Servicer):
 
 class GreeterStub:
     def __init__(self, channel):
-        self._stub = purerpc.client.Stub("Greeter", channel)
+        self._stub = purerpc.client.Client("Greeter", channel)
         self.SayHello = self._stub.get_method_stub("SayHello", RPCSignature(
             Cardinality.UNARY_UNARY, greeter_pb2.HelloRequest, greeter_pb2.HelloReply))
         self.SayHelloGoodbye = self._stub.get_method_stub("SayHelloGoodbye", RPCSignature(

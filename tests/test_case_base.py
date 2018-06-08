@@ -26,11 +26,15 @@ class PureRPCTestCase(unittest.TestCase):
             server.add_service(service)
             socket = server._create_socket_and_listen()
             queue.put(socket.getsockname()[1])
+            queue.close()
+            queue.join_thread()
             curio.run(server._run_async_server, socket)
 
         process = multiprocessing.Process(target=target_fn)
         process.start()
         port = queue.get()
+        queue.close()
+        queue.join_thread()
         try:
             yield port
         finally:
@@ -47,16 +51,48 @@ class PureRPCTestCase(unittest.TestCase):
             server.start()
 
             queue.put(port)
+            queue.close()
+            queue.join_thread()
             while True:
                 time.sleep(60)
 
         process = multiprocessing.Process(target=target_fn)
         process.start()
         port = queue.get()
+        queue.close()
+        queue.join_thread()
         try:
             yield port
         finally:
             process.terminate()
+            process.join()
+
+    def run_tests_in_workers(self, *, target, num_workers):
+        queue = multiprocessing.Queue()
+
+        def target_fn():
+            try:
+                target()
+            except:
+                queue.put(False)
+                raise
+            else:
+                queue.put(True)
+            queue.close()
+            queue.join_thread()
+
+        processes = []
+        for _ in range(num_workers):
+            process = multiprocessing.Process(target=target_fn)
+            process.start()
+            processes.append(process)
+
+        for _ in range(num_workers):
+            self.assertTrue(queue.get())
+        queue.close()
+        queue.join_thread()
+
+        for process in processes:
             process.join()
 
     @contextlib.contextmanager
