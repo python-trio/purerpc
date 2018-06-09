@@ -1,4 +1,5 @@
 import curio
+import socket
 import curio.io
 import datetime
 import collections
@@ -47,12 +48,13 @@ class GRPCStream:
 
 
 class GRPCSocket:
-    def __init__(self, config: GRPCConfiguration, socket: curio.io.Socket,
-                 receive_buffer_size=262144):
+    def __init__(self, config: GRPCConfiguration, sock: curio.io.Socket,
+                 receive_buffer_size=65536):
         self._grpc_connection = GRPCConnection(config=config)
         self._write_event = curio.Event()
         self._write_shutdown = False
-        self._socket = socket
+        self._socket = sock
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._receive_buffer_size = receive_buffer_size
 
         self._streams = {}  # type: Dict[int, GRPCStream]
