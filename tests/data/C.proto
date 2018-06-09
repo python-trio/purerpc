@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+import "A.proto";
+import "B.proto";
+
+service Service {
+    rpc Method(packageA.Message) returns (packageB.Message);
+}

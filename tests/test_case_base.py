@@ -96,25 +96,30 @@ class PureRPCTestCase(unittest.TestCase):
             process.join()
 
     @contextlib.contextmanager
-    def compile_temp_proto(self, proto_path_relative):
-        proto_path = os.path.join(os.path.dirname(__file__), proto_path_relative)
+    def compile_temp_proto(self, *relative_proto_paths):
+        modules = []
         with tempfile.TemporaryDirectory() as temp_dir:
-            proto_filename = os.path.basename(proto_path)
-            proto_temp_path = os.path.join(temp_dir, proto_filename)
-            shutil.copyfile(proto_path, proto_temp_path)
-            cmdline = [sys.executable, '-m', 'grpc_tools.protoc', '--python_out=.',
-                       '--purerpc_out=.', f'-I{temp_dir}', proto_temp_path]
-            subprocess.check_call(cmdline, cwd=temp_dir)
             sys.path.insert(0, temp_dir)
-            pb2_module_name = proto_filename.replace(".proto", "_pb2")
-            grpc_module_name = proto_filename.replace(".proto", "_grpc")
             try:
-                pb2_module = importlib.import_module(pb2_module_name)
-                grpc_module = importlib.import_module(grpc_module_name)
-                yield pb2_module, grpc_module
+                for relative_proto_path in relative_proto_paths:
+                    proto_path = os.path.join(os.path.dirname(__file__), relative_proto_path)
+                    proto_filename = os.path.basename(proto_path)
+                    proto_temp_path = os.path.join(temp_dir, proto_filename)
+                    shutil.copyfile(proto_path, proto_temp_path)
+                for relative_proto_path in relative_proto_paths:
+                    proto_filename = os.path.basename(relative_proto_path)
+                    proto_temp_path = os.path.join(temp_dir, proto_filename)
+                    cmdline = [sys.executable, '-m', 'grpc_tools.protoc', '--python_out=.',
+                               '--purerpc_out=.', f'-I{temp_dir}', proto_temp_path]
+                    subprocess.check_call(cmdline, cwd=temp_dir)
+                    pb2_module_name = proto_filename.replace(".proto", "_pb2")
+                    grpc_module_name = proto_filename.replace(".proto", "_grpc")
+                    pb2_module = importlib.import_module(pb2_module_name)
+                    grpc_module = importlib.import_module(grpc_module_name)
+                    modules.extend((pb2_module, grpc_module))
+                yield modules
             finally:
                 sys.path.remove(temp_dir)
-
 
     def setUp(self):
         self.configure_logs()

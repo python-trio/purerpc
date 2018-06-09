@@ -1,11 +1,9 @@
-import os
-
 import purerpc
 import purerpc.server
 from .test_case_base import PureRPCTestCase
 
 
-class TestClientServerSimple(PureRPCTestCase):
+class TestProtocPlugin(PureRPCTestCase):
     def test_plugin(self):
         with self.compile_temp_proto('data/greeter.proto') as (_, grpc_module):
             self.assertIn("GreeterServicer", dir(grpc_module))
@@ -34,3 +32,9 @@ class TestClientServerSimple(PureRPCTestCase):
             self.assertTrue(callable(greeter_stub.SayHelloGoodbye))
             self.assertIn("SayHelloToManyAtOnce", dir(greeter_stub))
             self.assertTrue(callable(greeter_stub.SayHelloToManyAtOnce))
+
+    def test_package_names_and_imports(self):
+        with self.compile_temp_proto('data/A.proto', 'data/B.proto', 'data/C.proto'):
+            # modules are imported by context manager
+            # if there is no error then we are good.
+            pass
