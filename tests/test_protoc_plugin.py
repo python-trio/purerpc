@@ -36,13 +36,9 @@ class TestProtocPlugin(PureRPCTestCase):
             self.assertTrue(callable(getattr(greeter_stub, "SayHelloToManyAtOnce")))
 
     def test_package_names_and_imports(self):
-        print("before")
         with self.compile_temp_proto('data/A.proto',
                                      'data/B.proto',
                                      'data/C.proto') as (A_pb2_module, A_grpc_module,
                                                          B_pb2_module, B_grpc_module,
                                                          C_pb2_module, C_grpc_module):
-            with open(C_grpc_module.__file__, "r") as fin:
-                print(fin.read())
             pass
-        print("after")
