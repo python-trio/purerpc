@@ -33,7 +33,6 @@ class TestProtocPlugin(PureRPCTestCase):
             self.assertIn("SayHelloGoodbye", dir(greeter_stub))
             self.assertTrue(callable(greeter_stub.SayHelloGoodbye))
             self.assertIn("SayHelloToManyAtOnce", dir(greeter_stub))
-            self.assertTrue(callable(getattr(greeter_stub, "SayHelloToManyAtOnce")))
             self.assertTrue(callable(greeter_stub.SayHelloToManyAtOnce))
 
     def test_package_names_and_imports(self):
