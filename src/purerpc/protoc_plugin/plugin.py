@@ -32,15 +32,6 @@ def get_python_type(proto_name, proto_type):
         return proto_type
 
 
-def get_proto(entity_name, imports, proto_for_entity, current_proto):
-    # if entity_name.startswith("."):
-    #     entity_name = entity_name[1:]
-    entity_proto = proto_for_entity[entity_name]
-    if entity_proto in imports:
-        return entity_proto
-    return current_proto
-
-
 def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                           proto_for_entity):
     contents = IMPORT_STRINGS
@@ -62,11 +53,9 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
             contents += ("        service_obj.add_method(\"{}\", self.{}, "
                          "RPCSignature({}, {}, {}))\n".format(
                              method.name, method.name, cardinality,
-                             get_python_type(get_proto(method.input_type, proto_file.dependency,
-                                                       proto_for_entity, proto_file.name),
+                             get_python_type(proto_for_entity[method.input_type],
                                              method.input_type),
-                             get_python_type(get_proto(method.output_type, proto_file.dependency,
-                                                       proto_for_entity, proto_file.name),
+                             get_python_type(proto_for_entity[method.output_type],
                                              method.output_type)))
         contents += "        return service_obj\n\n\n"
 
@@ -80,11 +69,9 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
             contents += ("        self.{} = self._client.get_method_stub("
                          "\"{}\", RPCSignature({}, {}, {}))\n".format(
                              method.name, method.name, cardinality,
-                             get_python_type(get_proto(method.input_type, proto_file.dependency,
-                                                       proto_for_entity, proto_file.name),
+                             get_python_type(proto_for_entity[method.input_type],
                                              method.input_type),
-                             get_python_type(get_proto(method.output_type, proto_file.dependency,
-                                                       proto_for_entity, proto_file.name),
+                             get_python_type(proto_for_entity[method.output_type],
                                              method.output_type)))
         contents += "\n\n"
 
