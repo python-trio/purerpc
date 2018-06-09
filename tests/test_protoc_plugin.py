@@ -11,29 +11,30 @@ class TestProtocPlugin(PureRPCTestCase):
             self.assertIn("GreeterServicer", dir(grpc_module))
             self.assertIn("GreeterStub", dir(grpc_module))
 
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+            GreeterServicer = grpc_module.GreeterServicer
             self.assertTrue(issubclass(GreeterServicer, purerpc.server.Servicer))
             self.assertIn("SayHello", dir(GreeterServicer))
-            self.assertTrue(callable(getattr(GreeterServicer, "SayHello")))
+            self.assertTrue(callable(GreeterServicer.SayHello))
             self.assertIn("SayHelloToMany", dir(GreeterServicer))
-            self.assertTrue(callable(getattr(GreeterServicer, "SayHelloToMany")))
+            self.assertTrue(callable(GreeterServicer.SayHelloToMany))
             self.assertIn("SayHelloGoodbye", dir(GreeterServicer))
-            self.assertTrue(callable(getattr(GreeterServicer, "SayHelloGoodbye")))
+            self.assertTrue(callable(GreeterServicer.SayHelloGoodbye))
             self.assertIn("SayHelloToManyAtOnce", dir(GreeterServicer))
-            self.assertTrue(callable(getattr(GreeterServicer, "SayHelloToManyAtOnce")))
+            self.assertTrue(callable(GreeterServicer.SayHelloToManyAtOnce))
             self.assertTrue(isinstance(GreeterServicer().service, purerpc.Service))
 
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterStub = grpc_module.GreeterStub
             channel = purerpc.Channel("localhost", 0)
             greeter_stub = GreeterStub(channel)
             self.assertIn("SayHello", dir(greeter_stub))
-            self.assertTrue(callable(getattr(greeter_stub, "SayHello")))
+            self.assertTrue(callable(greeter_stub.SayHello))
             self.assertIn("SayHelloToMany", dir(greeter_stub))
-            self.assertTrue(callable(getattr(greeter_stub, "SayHelloToMany")))
+            self.assertTrue(callable(greeter_stub.SayHelloToMany))
             self.assertIn("SayHelloGoodbye", dir(greeter_stub))
-            self.assertTrue(callable(getattr(greeter_stub, "SayHelloGoodbye")))
+            self.assertTrue(callable(greeter_stub.SayHelloGoodbye))
             self.assertIn("SayHelloToManyAtOnce", dir(greeter_stub))
             self.assertTrue(callable(getattr(greeter_stub, "SayHelloToManyAtOnce")))
+            self.assertTrue(callable(greeter_stub.SayHelloToManyAtOnce))
 
     def test_package_names_and_imports(self):
         with self.compile_temp_proto('data/A.proto',

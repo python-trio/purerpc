@@ -12,7 +12,7 @@ from .test_case_base import PureRPCTestCase
 class TestClientServerCodegen(PureRPCTestCase):
     def test_purerpc_server_grpc_client(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+            GreeterServicer = grpc_module.GreeterServicer
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
@@ -94,7 +94,7 @@ class TestClientServerCodegen(PureRPCTestCase):
                 for name in names:
                     yield HelloRequest(name=name)
             
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterStub = grpc_module.GreeterStub
             async def worker(channel):
                 stub = GreeterStub(channel)
                 self.assertEqual(
@@ -125,8 +125,8 @@ class TestClientServerCodegen(PureRPCTestCase):
 
     def test_purerpc_server_purerpc_client(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterServicer = grpc_module.GreeterServicer
+            GreeterStub = grpc_module.GreeterStub
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
@@ -185,8 +185,8 @@ class TestClientServerCodegen(PureRPCTestCase):
 
     def test_purerpc_server_purerpc_client_large_payload_many_streams(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterServicer = grpc_module.GreeterServicer
+            GreeterStub = grpc_module.GreeterStub
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
@@ -212,8 +212,8 @@ class TestClientServerCodegen(PureRPCTestCase):
 
     def test_purerpc_server_purerpc_client_large_payload_one_stream(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterServicer = grpc_module.GreeterServicer
+            GreeterStub = grpc_module.GreeterStub
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
@@ -239,7 +239,7 @@ class TestClientServerCodegen(PureRPCTestCase):
 
     def test_purerpc_server_grpc_client_large_payload(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+            GreeterServicer = grpc_module.GreeterServicer
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
