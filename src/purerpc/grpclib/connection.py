@@ -1,6 +1,7 @@
 import logging
 import datetime
 
+import h2.stream
 import h2.errors
 import h2.events
 import h2.connection
@@ -15,10 +16,41 @@ from .buffers import MessageReadBuffer, MessageWriteBuffer
 logger = logging.getLogger(__name__)
 
 
+def monkey_patch_h2_reset_on_closed_stream_bug():
+    """
+    H2 raises h2.exceptions.StreamClosedError when receiving RST_STREAM on a closed stream that was
+    not closed by endpoint, for example:
+    
+    -> HEADERS frame
+    -> DATA frame with END_STREAM flag set  # stream is now half-closed (local)
+    <- HEADERS frame
+    <- DATA frame
+    <- HEADERS frame with END_STREAM flag set  # stream is now closed
+    <- RST_STREAM
+
+    This is the case when calling unary-unary requests with purerpc client and grpcio server
+    (it sends END_STREAM + RST_STREAM because the RPC call is unary-unary and it cannot receive
+    any more data).
+
+    To fix this, we use a workaround.
+    """
+    h2.stream._transitions[h2.stream.StreamState.CLOSED,
+                           h2.stream.StreamInputs.RECV_RST_STREAM] = \
+        (None, h2.stream.StreamState.CLOSED)
+
+    h2.stream._transitions[h2.stream.StreamState.CLOSED,
+                           h2.stream.StreamInputs.RECV_WINDOW_UPDATE] = \
+        (None, h2.stream.StreamState.CLOSED)
+
+
+monkey_patch_h2_reset_on_closed_stream_bug()
+
+
 class GRPCConnection:
     def __init__(self, config: GRPCConfiguration):
         self.config = config
         self.h2_connection = h2.connection.H2Connection(config._h2_config)
+        self._new_settings_applied = False
         self.message_read_buffers = {}
 
         # if stream_id in this dict, that means that write stream end was requested and the
@@ -134,23 +166,26 @@ class GRPCConnection:
 
     def initiate_connection(self):
         self.h2_connection.initiate_connection()
-        self.h2_connection.update_settings({
-            SettingCodes.MAX_CONCURRENT_STREAMS: 1000,
-            SettingCodes.INITIAL_WINDOW_SIZE: 128 * 1024,
-            SettingCodes.MAX_FRAME_SIZE: 128 * 1024,
-        })
+        # self.h2_connection.update_settings({
+        #     SettingCodes.MAX_CONCURRENT_STREAMS: 1000,
+        #     SettingCodes.INITIAL_WINDOW_SIZE: 128 * 1024,
+        #     SettingCodes.MAX_FRAME_SIZE: 128 * 1024,
+        # })
 
     def data_to_send(self, amount: int = None):
         stream_write_pending_remove_flag = []
         # TODO: computations may be too heavy when repeatedly calling data_to_send with small amount
         for stream_id in self.stream_write_pending:
+            if len(self.message_write_buffers[stream_id]) == 0:
+                stream_write_pending_remove_flag.append(stream_id)
+                continue
             num_bytes_to_send = min(self.h2_connection.max_outbound_frame_size,
                                     self.h2_connection.local_flow_control_window(stream_id),
                                     len(self.message_write_buffers[stream_id]))
-            data_to_send = self.message_write_buffers[stream_id].data_to_send(num_bytes_to_send)
-            self.h2_connection.send_data(stream_id, data_to_send)
-            if len(self.message_write_buffers[stream_id]) == 0:
-                stream_write_pending_remove_flag.append(stream_id)
+            if num_bytes_to_send > 0:
+                data_to_send = self.message_write_buffers[stream_id].data_to_send(num_bytes_to_send)
+                self.h2_connection.send_data(stream_id, data_to_send)
+
         for stream_id in stream_write_pending_remove_flag:
             self.stream_write_pending.remove(stream_id)
 

@@ -28,17 +28,17 @@ class GRPCStream:
     def client_side(self):
         return self._client_side
 
-    async def send_message(self, message):
+    async def _send(self, message):
         await self._outgoing_messages.put(message)
         await self._socket._write_event.set()
 
-    async def receive_event(self):
+    async def _receive(self):
         return await self._incoming_events.get()
 
     async def close(self, status=None, status_message=None, custom_metadata=()):
         if self._client_side and (status or status_message or custom_metadata):
             raise ValueError("Client side streams cannot be closed with non-default arguments")
-        await self.send_message(StreamClose(status, status_message, custom_metadata))
+        await self._send(StreamClose(status, status_message, custom_metadata))
 
     async def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
         if self._client_side:
@@ -48,7 +48,7 @@ class GRPCStream:
 
 class GRPCSocket:
     def __init__(self, config: GRPCConfiguration, socket: curio.io.Socket,
-                 receive_buffer_size=65536):
+                 receive_buffer_size=262144):
         self._grpc_connection = GRPCConnection(config=config)
         self._write_event = curio.Event()
         self._write_shutdown = False

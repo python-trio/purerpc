@@ -4,7 +4,7 @@ import curio.io
 from purerpc.grpclib.config import GRPCConfiguration
 from purerpc.grpclib.events import MessageReceived, RequestEnded, ResponseEnded
 
-from .grpc_socket import GRPCStream, GRPCSocket, StreamClose
+from .grpc_socket import GRPCStream, GRPCSocket
 
 
 class GRPCProtoStream(GRPCStream):
@@ -12,19 +12,35 @@ class GRPCProtoStream(GRPCStream):
                  incoming_buffer_size=10, outgoing_buffer_size=10):
         super().__init__(socket, stream_id, client_side, incoming_buffer_size, outgoing_buffer_size)
         self._incoming_message_type = None
+        self._start_stream_event = None
+        self._end_stream_event = None
+
+    @property
+    def start_stream_event(self):
+        return self._start_stream_event
+
+    @property
+    def end_stream_event(self):
+        return self._end_stream_event
 
     def expect_message_type(self, message_type):
         self._incoming_message_type = message_type
 
     async def send_message(self, message):
-        return await super().send_message(message.SerializeToString())
+        return await super()._send(message.SerializeToString())
 
     async def receive_event(self):
-        event = await super().receive_event()
+        event = await super()._receive()
         if isinstance(event, MessageReceived) and self._incoming_message_type is not None:
             binary_data = event.data
             event.data = self._incoming_message_type()
             event.data.ParseFromString(binary_data)
+        elif isinstance(event, RequestEnded) or isinstance(event, ResponseEnded):
+            assert self._end_stream_event is None
+            self._end_stream_event = event
+        else:
+            assert self._start_stream_event is None
+            self._start_stream_event = event
         return event
 
     async def receive_message(self):
@@ -35,11 +51,6 @@ class GRPCProtoStream(GRPCStream):
             return event.data
         else:
             return await self.receive_message()
-
-    async def close(self, status=None, status_message=None, custom_metadata=()):
-        if self._client_side and (status or status_message or custom_metadata):
-            raise ValueError("Client side streams cannot be closed with non-default arguments")
-        await super().send_message(StreamClose(status, status_message, custom_metadata))
 
     async def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
         return await super().start_response(
