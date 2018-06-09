@@ -7,6 +7,7 @@ from google.protobuf.compiler.plugin_pb2 import CodeGeneratorRequest
 from google.protobuf.compiler.plugin_pb2 import CodeGeneratorResponse
 from google.protobuf import descriptor_pb2
 from purerpc.rpc import Cardinality
+import itertools
 
 IMPORT_STRINGS = """import purerpc.server
 import purerpc.client
@@ -25,23 +26,23 @@ def simple_type(type_):
 
 
 def get_python_type(proto_name, proto_type):
-    print(proto_name, proto_type, file=sys.stderr)
     if proto_type.startswith("."):
         return get_python_package(proto_name) + "." + simple_type(proto_type)
     else:
         return proto_type
 
 
-def get_proto(entity_name, imports, named_entities, current_proto):
-    simple_name = simple_type(entity_name)
-    for import_ in imports:
-        if simple_name in named_entities[import_]:
-            return import_
+def get_proto(entity_name, imports, proto_for_entity, current_proto):
+    # if entity_name.startswith("."):
+    #     entity_name = entity_name[1:]
+    entity_proto = proto_for_entity[entity_name]
+    if entity_proto in imports:
+        return entity_proto
     return current_proto
 
 
 def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
-                          named_entities):
+                          proto_for_entity):
     contents = IMPORT_STRINGS
     contents += "import {}\n".format(get_python_package(proto_file.name))
     for dep_module in proto_file.dependency:
@@ -62,10 +63,10 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                          "RPCSignature({}, {}, {}))\n".format(
                              method.name, method.name, cardinality,
                              get_python_type(get_proto(method.input_type, proto_file.dependency,
-                                                       named_entities, proto_file.name),
+                                                       proto_for_entity, proto_file.name),
                                              method.input_type),
                              get_python_type(get_proto(method.output_type, proto_file.dependency,
-                                                       named_entities, proto_file.name),
+                                                       proto_for_entity, proto_file.name),
                                              method.output_type)))
         contents += "        return service_obj\n\n\n"
 
@@ -80,10 +81,10 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                          "\"{}\", RPCSignature({}, {}, {}))\n".format(
                              method.name, method.name, cardinality,
                              get_python_type(get_proto(method.input_type, proto_file.dependency,
-                                                       named_entities, proto_file.name),
+                                                       proto_for_entity, proto_file.name),
                                              method.input_type),
                              get_python_type(get_proto(method.output_type, proto_file.dependency,
-                                                       named_entities, proto_file.name),
+                                                       proto_for_entity, proto_file.name),
                                              method.output_type)))
         contents += "\n\n"
 
@@ -96,20 +97,21 @@ def main():
     files_to_generate = set(request.file_to_generate)
 
     response = CodeGeneratorResponse()
-    named_entities = defaultdict(set)
+    proto_for_entity = dict()
     for proto_file in request.proto_file:
-        for message in proto_file.message_type:
-            named_entities[proto_file.name].add(message.name)
-        for enum in proto_file.enum_type:
-            named_entities[proto_file.name].add(enum.name)
-        for service in proto_file.service:
-            named_entities[proto_file.name].add(service.name)
-        for extension in proto_file.extension:
-            named_entities[proto_file.name].add(extension.name)
+        package_name = proto_file.package
+        for named_entity in itertools.chain(proto_file.message_type,
+                                            proto_file.enum_type,
+                                            proto_file.service,
+                                            proto_file.extension):
+            if package_name:
+                fully_qualified_name = ".".join(["", package_name, named_entity.name])
+            else:
+                fully_qualified_name = "." + named_entity.name
+            proto_for_entity[fully_qualified_name] = proto_file.name
     for proto_file in request.proto_file:
         if proto_file.name in files_to_generate:
             out = response.file.add()
             out.name = proto_file.name.replace('.proto', "_grpc.py")
-            out.content = generate_single_proto(proto_file, named_entities)
-
+            out.content = generate_single_proto(proto_file, proto_for_entity)
     sys.stdout.buffer.write(response.SerializeToString())
