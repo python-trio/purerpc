@@ -100,10 +100,8 @@ def main():
     proto_for_entity = dict()
     for proto_file in request.proto_file:
         package_name = proto_file.package
-        for named_entity in itertools.chain(proto_file.message_type,
-                                            proto_file.enum_type,
-                                            proto_file.service,
-                                            proto_file.extension):
+        for named_entity in itertools.chain(proto_file.message_type, proto_file.enum_type,
+                                            proto_file.service, proto_file.extension):
             if package_name:
                 fully_qualified_name = ".".join(["", package_name, named_entity.name])
             else:

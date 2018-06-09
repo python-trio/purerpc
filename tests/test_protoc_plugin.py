@@ -1,5 +1,3 @@
-import os
-
 import purerpc
 import purerpc.server
 from .test_case_base import PureRPCTestCase
@@ -38,7 +36,7 @@ class TestProtocPlugin(PureRPCTestCase):
     def test_package_names_and_imports(self):
         with self.compile_temp_proto('data/A.proto',
                                      'data/B.proto',
-                                     'data/C.proto') as (A_pb2_module, A_grpc_module,
-                                                         B_pb2_module, B_grpc_module,
-                                                         C_pb2_module, C_grpc_module):
+                                     'data/C.proto'):
+            # modules are imported by context manager
+            # if there is no error then we are good.
             pass
