@@ -39,6 +39,10 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
     for dep_module in proto_file.dependency:
         contents += "import {}\n".format(get_python_package(dep_module))
     for service in proto_file.service:
+        if proto_file.package:
+            fully_qualified_service_name = proto_file.package + "." + service.name
+        else:
+            fully_qualified_service_name = service.name
         contents += "\n\nclass {}Servicer(purerpc.server.Servicer):\n".format(service.name)
         for method in service.method:
             contents += "    async def {}(self, input_message{}):\n".format(
@@ -46,7 +50,8 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
             contents += "        raise NotImplementedError()\n\n"
         contents += "    @property\n"
         contents += "    def service(self) -> purerpc.server.Service:\n"
-        contents += "        service_obj = purerpc.server.Service(\"{}\")\n".format(service.name)
+        contents += "        service_obj = purerpc.server.Service(\"{}\")\n".format(
+            fully_qualified_service_name)
         for method in service.method:
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
@@ -62,7 +67,7 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
         contents += "class {}Stub:\n".format(service.name)
         contents += "    def __init__(self, channel):\n"
         contents += "        self._client = purerpc.client.Client(\"{}\", channel)\n".format(
-            service.name)
+            fully_qualified_service_name)
         for method in service.method:
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
