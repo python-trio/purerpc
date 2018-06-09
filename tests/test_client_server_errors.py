@@ -12,7 +12,7 @@ from .test_case_base import PureRPCTestCase
 class TestClientServerErrors(PureRPCTestCase):
     def test_errors_purerpc_server_grpc_client(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
+            GreeterServicer = grpc_module.GreeterServicer
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
@@ -57,7 +57,7 @@ class TestClientServerErrors(PureRPCTestCase):
                 for _ in range(10):
                     yield HelloRequest()
 
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterStub = grpc_module.GreeterStub
             async def worker(channel):
                 stub = GreeterStub(channel)
                 with self.assertRaisesRegex(RuntimeError, r"oops my bad"):
@@ -77,8 +77,8 @@ class TestClientServerErrors(PureRPCTestCase):
 
     def test_errors_purerpc_server_purerpc_client(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
-            GreeterServicer = getattr(grpc_module, "GreeterServicer")
-            GreeterStub = getattr(grpc_module, "GreeterStub")
+            GreeterServicer = grpc_module.GreeterServicer
+            GreeterStub = grpc_module.GreeterStub
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
