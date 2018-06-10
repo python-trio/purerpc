@@ -9,6 +9,7 @@ import curio.meta
 import typing
 import logging
 
+from .grpclib.status import Status, StatusCode
 from purerpc.grpc_proto import GRPCProtoStream, GRPCProtoSocket
 from purerpc.grpc_socket import GRPCSocket, GRPCStream
 from purerpc.rpc import RPCSignature, Cardinality
@@ -119,7 +120,7 @@ class ConnectionHandler:
                 await call_server_unary_unary(method_fn, stream)
         except:
             logging.exception("Got exception while writing response stream")
-            await stream.close(1, status_message=repr(sys.exc_info()))
+            await stream.close(Status(StatusCode.CANCELLED, status_message=repr(sys.exc_info())))
 
     async def __call__(self, socket, addr):
         self.grpc_socket = GRPCProtoSocket(self.config, socket)

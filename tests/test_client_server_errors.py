@@ -5,7 +5,7 @@ import typing
 import time
 from .greeter_pb2 import HelloReply, HelloRequest
 from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
-from purerpc import Service, Stream, Channel, Client
+from purerpc import Service, Stream, Channel, Client, RemoteCallFailedError
 from .test_case_base import PureRPCTestCase
 
 
@@ -60,13 +60,13 @@ class TestClientServerErrors(PureRPCTestCase):
             GreeterStub = grpc_module.GreeterStub
             async def worker(channel):
                 stub = GreeterStub(channel)
-                with self.assertRaisesRegex(RuntimeError, r"oops my bad"):
+                with self.assertRaisesRegex(RemoteCallFailedError, r"oops my bad"):
                     await stub.SayHello(HelloRequest(name="World"))
 
                 aiter = stub.SayHelloToMany(generator())
                 for _ in range(7):
                     await aiter.__anext__()
-                with self.assertRaisesRegex(RuntimeError, r"Lucky 7"):
+                with self.assertRaisesRegex(RemoteCallFailedError, r"Lucky 7"):
                     await aiter.__anext__()
 
             async def main():
@@ -99,13 +99,13 @@ class TestClientServerErrors(PureRPCTestCase):
 
                 async def worker(channel):
                     stub = GreeterStub(channel)
-                    with self.assertRaisesRegex(RuntimeError, "oops my bad"):
+                    with self.assertRaisesRegex(RemoteCallFailedError, "oops my bad"):
                         await stub.SayHello(HelloRequest(name="World"))
 
                     aiter = stub.SayHelloToMany(generator())
                     for _ in range(7):
                         await aiter.__anext__()
-                    with self.assertRaisesRegex(RuntimeError, r"Lucky 7"):
+                    with self.assertRaisesRegex(RemoteCallFailedError, r"Lucky 7"):
                         await aiter.__anext__()
 
                 async def main():

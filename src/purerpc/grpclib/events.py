@@ -1,6 +1,7 @@
 import base64
 import datetime
 from .exceptions import ProtocolError
+from .status import Status
 
 
 class Event:
@@ -138,10 +139,9 @@ class ResponseReceived(Event):
 
 
 class ResponseEnded(Event):
-    def __init__(self, stream_id: int, status: int):
+    def __init__(self, stream_id: int, status: Status):
         self.stream_id = stream_id
         self.status = status
-        self.status_message = None
         self.custom_metadata = {}
 
     @staticmethod
@@ -149,12 +149,14 @@ class ResponseEnded(Event):
         if "grpc-status" not in headers:
             raise ProtocolError("Expected grpc-status in trailers")
 
-        status = int(headers.pop("grpc-status"))
-        event = ResponseEnded(stream_id, status)
-
+        status_code = int(headers.pop("grpc-status"))
         if "grpc-message" in headers:
             # TODO: is percent encoded
-            event.status_message = headers.pop("grpc-message")
+            status_message = headers.pop("grpc-message")
+        else:
+            status_message = ""
+
+        event = ResponseEnded(stream_id, Status(status_code, status_message))
 
         for header_name in list(headers.keys()):
             if header_name.endswith("-bin"):

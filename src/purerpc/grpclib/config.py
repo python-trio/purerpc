@@ -12,6 +12,9 @@ class GRPCConfiguration:
         self._server_string = server_string
         self._user_agent = user_agent
         self._message_encoding = message_encoding
+
+        # TODO: this does not need to be passed in config, may be just a single global string
+        # with all encodings supported by grpclib
         if message_accept_encoding is not None:
             self._message_accept_encoding = ",".join(message_accept_encoding)
         else:

@@ -9,7 +9,7 @@ from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import RequestReceived, RequestEnded, ResponseEnded
 
 
-StreamClose = collections.namedtuple("StreamClose", ["status", "status_message", "custom_metadata"])
+StreamClose = collections.namedtuple("StreamClose", ["status", "custom_metadata"])
 
 
 class GRPCStream:
@@ -36,10 +36,10 @@ class GRPCStream:
     async def _receive(self):
         return await self._incoming_events.get()
 
-    async def close(self, status=None, status_message=None, custom_metadata=()):
-        if self._client_side and (status or status_message or custom_metadata):
+    async def close(self, status=None, custom_metadata=()):
+        if self._client_side and (status or custom_metadata):
             raise ValueError("Client side streams cannot be closed with non-default arguments")
-        await self._send(StreamClose(status, status_message, custom_metadata))
+        await self._send(StreamClose(status, custom_metadata))
 
     async def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
         if self._client_side:
@@ -92,7 +92,6 @@ class GRPCSocket:
                             self._grpc_connection.end_request(stream_id)
                         else:
                             self._grpc_connection.end_response(stream_id, message.status,
-                                                               message.status_message,
                                                                message.custom_metadata)
                         ended_streams.append(stream_id)
                     else:

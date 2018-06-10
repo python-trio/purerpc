@@ -8,6 +8,7 @@ import h2.connection
 import h2.exceptions
 from h2.settings import SettingCodes
 
+from .status import Status
 from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded
 from .exceptions import ProtocolError
@@ -307,13 +308,15 @@ class GRPCConnection:
             headers.append(("grpc-accept-encoding", self.config._message_accept_encoding))
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
-    def end_response(self, stream_id: int, status: int, status_message=None, custom_metadata=()):
+    # TODO: need method to start and end response in one single trailers frame
+
+    def end_response(self, stream_id: int, status: Status, custom_metadata=()):
         trailers = [
-            ("grpc-status", str(status)),
+            ("grpc-status", str(status.int_value)),
             *custom_metadata,
         ]
-        if status_message is not None:
+        if status.status_message:
             # TODO: should be percent encoded
-            trailers.append(("grpc-message", status_message))
+            trailers.append(("grpc-message", status.status_message))
         self.stream_write_trailers[stream_id] = trailers
         self.stream_write_pending.add(stream_id)

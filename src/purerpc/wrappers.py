@@ -1,4 +1,6 @@
 import curio.meta
+from .grpclib.exceptions import ProtocolError, RemoteCallFailedError
+from .grpclib.status import Status, StatusCode
 from purerpc.grpc_proto import GRPCProtoStream
 from purerpc.grpclib.events import ResponseEnded
 
@@ -7,11 +9,11 @@ async def extract_message_from_singleton_stream(stream):
     msg = await stream.receive_message()
     if msg is None:
         event = stream.end_stream_event
-        if isinstance(event, ResponseEnded) and event.status != 0:
-            raise RuntimeError(f"RPC failed with code {event.status}: {event.status_message}")
-        raise RuntimeError("Expected one message, got zero")
+        if isinstance(event, ResponseEnded) and event.status.status_code != StatusCode.OK:
+            raise RemoteCallFailedError(event.status)
+        raise ProtocolError("Expected one message, got zero")
     if await stream.receive_message() is not None:
-        raise RuntimeError("Expected one message, got multiple")
+        raise ProtocolError("Expected one message, got multiple")
     return msg
 
 
@@ -20,8 +22,8 @@ async def stream_to_async_iterator(stream: GRPCProtoStream):
         msg = await stream.receive_message()
         if msg is None:
             event = stream.end_stream_event
-            if isinstance(event, ResponseEnded) and event.status != 0:
-                raise RuntimeError(f"RPC failed with code {event.status}: {event.status_message}")
+            if isinstance(event, ResponseEnded) and event.status.status_code != StatusCode.OK:
+                raise RemoteCallFailedError(event.status)
             return
         yield msg
 
@@ -30,7 +32,12 @@ async def send_multiple_messages_server(stream, agen):
     async with curio.meta.finalize(agen) as tmp:
         async for message in tmp:
             await stream.send_message(message)
-    await stream.close(0)
+    await stream.close(Status(StatusCode.OK))
+
+
+async def send_single_message_server(stream, message):
+    await stream.send_message(message)
+    await stream.close(Status(StatusCode.OK))
 
 
 async def send_multiple_messages_client(stream, agen):
@@ -42,14 +49,14 @@ async def send_multiple_messages_client(stream, agen):
         await stream.close()
 
 
-async def send_single_message(stream, message):
+async def send_single_message_client(stream, message):
     await stream.send_message(message)
-    await stream.close(0)
+    await stream.close()
 
 
 async def call_server_unary_unary(func, stream):
     msg = await extract_message_from_singleton_stream(stream)
-    await send_single_message(stream, await func(msg))
+    await send_single_message_server(stream, await func(msg))
 
 
 async def call_server_unary_stream(func, stream):
@@ -59,7 +66,7 @@ async def call_server_unary_stream(func, stream):
 
 async def call_server_stream_unary(func, stream):
     input_message_stream = stream_to_async_iterator(stream)
-    await send_single_message(stream, await func(input_message_stream))
+    await send_single_message_server(stream, await func(input_message_stream))
 
 
 async def call_server_stream_stream(func, stream):
@@ -75,14 +82,14 @@ class ClientStub:
 class ClientStubUnaryUnary(ClientStub):
     async def __call__(self, message):
         stream = await self._stream_fn()
-        await send_single_message(stream, message)
+        await send_single_message_client(stream, message)
         return await extract_message_from_singleton_stream(stream)
 
 
 class ClientStubUnaryStream(ClientStub):
     async def __call__(self, message):
         stream = await self._stream_fn()
-        await send_single_message(stream, message)
+        await send_single_message_client(stream, message)
         async for message in stream_to_async_iterator(stream):
             yield message
 
