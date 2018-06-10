@@ -1,5 +1,5 @@
 import curio.meta
-from .grpclib.exceptions import ProtocolError, RemoteCallFailedError
+from .grpclib.exceptions import ProtocolError, raise_status
 from .grpclib.status import Status, StatusCode
 from purerpc.grpc_proto import GRPCProtoStream
 from purerpc.grpclib.events import ResponseEnded
@@ -9,8 +9,8 @@ async def extract_message_from_singleton_stream(stream):
     msg = await stream.receive_message()
     if msg is None:
         event = stream.end_stream_event
-        if isinstance(event, ResponseEnded) and event.status.status_code != StatusCode.OK:
-            raise RemoteCallFailedError(event.status)
+        if isinstance(event, ResponseEnded):
+            raise_status(event.status)
         raise ProtocolError("Expected one message, got zero")
     if await stream.receive_message() is not None:
         raise ProtocolError("Expected one message, got multiple")
@@ -22,8 +22,8 @@ async def stream_to_async_iterator(stream: GRPCProtoStream):
         msg = await stream.receive_message()
         if msg is None:
             event = stream.end_stream_event
-            if isinstance(event, ResponseEnded) and event.status.status_code != StatusCode.OK:
-                raise RemoteCallFailedError(event.status)
+            if isinstance(event, ResponseEnded):
+                raise_status(event.status)
             return
         yield msg
 

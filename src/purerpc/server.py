@@ -10,6 +10,7 @@ import typing
 import logging
 
 from .grpclib.status import Status, StatusCode
+from .grpclib.exceptions import RpcFailedError
 from purerpc.grpc_proto import GRPCProtoStream, GRPCProtoSocket
 from purerpc.grpc_socket import GRPCSocket, GRPCStream
 from purerpc.rpc import RPCSignature, Cardinality
@@ -103,10 +104,27 @@ class ConnectionHandler:
         await stream.start_response(stream.stream_id, "+proto")
         event = await stream.receive_event()
 
-        # TODO: Should at least pass through GeneratorExit
         try:
             service = self.server.services[event.service_name]
+        except KeyError:
+            await stream.close(Status(
+                StatusCode.UNIMPLEMENTED,
+                status_message=f"Service {event.service_name} is not implemented"
+            ))
+            return
+
+        try:
             bound_rpc_method = service.methods[event.method_name]
+        except KeyError:
+            await stream.close(Status(
+                StatusCode.UNIMPLEMENTED,
+                status_message=f"Method {event.method_name} is not implemented in "
+                               f"service {event.service_name}"
+            ))
+            return
+
+        # TODO: Should at least pass through GeneratorExit
+        try:
             method_fn = bound_rpc_method.method_fn
             cardinality = bound_rpc_method.signature.cardinality
             stream.expect_message_type(bound_rpc_method.signature.request_type)
@@ -118,6 +136,8 @@ class ConnectionHandler:
                 await call_server_stream_unary(method_fn, stream)
             else:
                 await call_server_unary_unary(method_fn, stream)
+        except RpcFailedError as error:
+            await stream.close(error.status)
         except:
             logging.exception("Got exception while writing response stream")
             await stream.close(Status(StatusCode.CANCELLED, status_message=repr(sys.exc_info())))

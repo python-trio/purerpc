@@ -34,7 +34,9 @@ class TestProtocPlugin(PureRPCTestCase):
             self.assertTrue(callable(greeter_stub.SayHelloToManyAtOnce))
 
     def test_package_names_and_imports(self):
-        with self.compile_temp_proto('data/A.proto', 'data/B.proto', 'data/C.proto'):
+        with self.compile_temp_proto('data/test_package_names/A.proto',
+                                     'data/test_package_names/B.proto',
+                                     'data/test_package_names/C.proto'):
             # modules are imported by context manager
             # if there is no error then we are good.
             pass
