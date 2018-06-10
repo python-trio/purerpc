@@ -13,8 +13,6 @@ class UnsupportedMessageEncodingError(ProtocolError):
     pass
 
 
-# TODO: add tests for status codes in client
-# TODO: add tests for correct status codes in server
 class RpcFailedError(GRPCError):
 	def __init__(self, status):
 		super().__init__(f"RPC failed with status {status}")
@@ -45,7 +43,7 @@ class DeadlineExceededError(RpcFailedError):
 		super().__init__(Status(StatusCode.DEADLINE_EXCEEDED, message))
 
 
-class NotFoundErrorError(RpcFailedError):
+class NotFoundError(RpcFailedError):
 	def __init__(self, message=""):
 		super().__init__(Status(StatusCode.NOT_FOUND, message))
 
@@ -115,7 +113,7 @@ def raise_status(status: Status):
 	elif status.status_code == StatusCode.DEADLINE_EXCEEDED:
 		raise DeadlineExceededError(status.status_message)
 	elif status.status_code == StatusCode.NOT_FOUND:
-		raise NotFoundErrorError(status.status_message)
+		raise NotFoundError(status.status_message)
 	elif status.status_code == StatusCode.ALREADY_EXISTS:
 		raise AlreadyExistsError(status.status_message)
 	elif status.status_code == StatusCode.PERMISSION_DENIED:
