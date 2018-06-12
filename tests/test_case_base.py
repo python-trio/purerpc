@@ -15,9 +15,15 @@ import logging
 import logging.config
 import contextlib
 import time
+import random
+import string
 
 
 class PureRPCTestCase(unittest.TestCase):
+    def random_payload(self, min_size=1000, max_size=100000):
+        return "".join(random.choice(string.ascii_letters)
+                       for _ in range(random.randint(min_size, max_size)))
+
     @contextlib.contextmanager
     def run_purerpc_service_in_process(self, service):
         queue = multiprocessing.Queue()

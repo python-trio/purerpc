@@ -54,7 +54,7 @@ class GRPCSocket:
         self._write_event = curio.Event()
         self._write_shutdown = False
         self._socket = sock
-        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        # self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._receive_buffer_size = receive_buffer_size
 
         self._streams = {}  # type: Dict[int, GRPCStream]
@@ -86,7 +86,7 @@ class GRPCSocket:
             ended_streams = []
             for stream_id, stream in self._streams.items():
                 while not stream._outgoing_messages.empty():
-                    message = stream._outgoing_messages._get()
+                    message = await stream._outgoing_messages.get()
                     if isinstance(message, StreamClose):
                         if stream.client_side:
                             self._grpc_connection.end_request(stream_id)

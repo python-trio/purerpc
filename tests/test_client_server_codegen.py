@@ -255,3 +255,94 @@ class TestClientServerCodegen(PureRPCTestCase):
                             "Hello, " + data
                         )
                 self.run_tests_in_workers(target=target_fn, num_workers=50)
+
+    def test_purerpc_server_purerpc_client_random(self):
+        with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
+            GreeterServicer = grpc_module.GreeterServicer
+            GreeterStub = grpc_module.GreeterStub
+
+            class Servicer(GreeterServicer):
+                async def SayHello(self, message):
+                    return HelloReply(message=message.name)
+
+                async def SayHelloGoodbye(self, message):
+                    yield HelloReply(message=message.name)
+                    yield HelloReply(message=message.name)
+
+                async def SayHelloToManyAtOnce(self, messages):
+                    names = []
+                    async for message in messages:
+                        names.append(message.name)
+                    return HelloReply(message="".join(names))
+
+                async def SayHelloToMany(self, messages):
+                    async for message in messages:
+                        yield HelloReply(message=message.name)
+
+            with self.run_purerpc_service_in_process(Servicer().service) as port:
+                async def worker(channel):
+                    stub = GreeterStub(channel)
+                    data = self.random_payload()
+                    async def gen():
+                        for _ in range(4):
+                            yield HelloRequest(name=data)
+                    self.assertEqual(
+                        (await stub.SayHello(HelloRequest(name=data))).message,
+                        data
+                    )
+                    self.assertEqual(
+                        [response.message async for response in
+                            stub.SayHelloGoodbye(HelloRequest(name=data))],
+                        [data, data]
+                    )
+                    self.assertEqual(
+                        (await stub.SayHelloToManyAtOnce(gen())).message,
+                        data + data + data + data
+                    )
+                    self.assertEqual(
+                        [response.message async for response in stub.SayHelloToMany(gen())],
+                        [data, data, data, data]
+                    )
+
+                async def main():
+                    channel = Channel("localhost", port)
+                    await channel.connect()
+                    async with curio.TaskGroup() as task_group:
+                        for _ in range(20):
+                            await task_group.spawn(worker(channel))
+
+                curio.run(main)
+
+
+    def test_purerpc_server_purerpc_client_deadlock(self):
+        with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
+            GreeterServicer = grpc_module.GreeterServicer
+            GreeterStub = grpc_module.GreeterStub
+
+            class Servicer(GreeterServicer):
+                async def SayHelloToMany(self, messages):
+                    data = ""
+                    async for message in messages:
+                        data += message.name
+                    yield HelloReply(message=data)
+
+            with self.run_purerpc_service_in_process(Servicer().service) as port:
+                async def worker(channel):
+                    stub = GreeterStub(channel)
+                    data = self.random_payload(min_size=32000, max_size=64000)
+                    async def gen():
+                        for _ in range(20):
+                            yield HelloRequest(name=data)
+                    self.assertEqual(
+                        [response.message async for response in stub.SayHelloToMany(gen())],
+                        [data * 20]
+                    )
+
+                async def main():
+                    channel = Channel("localhost", port)
+                    await channel.connect()
+                    async with curio.TaskGroup() as task_group:
+                        for _ in range(1):
+                            await task_group.spawn(worker(channel))
+
+                curio.run(main)
