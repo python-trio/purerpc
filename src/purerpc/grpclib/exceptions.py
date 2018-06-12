@@ -9,6 +9,10 @@ class ProtocolError(GRPCError):
     pass
 
 
+class MessageTooLargeError(ProtocolError):
+	pass
+
+
 class UnsupportedMessageEncodingError(ProtocolError):
     pass
 
