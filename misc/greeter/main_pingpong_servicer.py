@@ -1,3 +1,5 @@
+import argparse
+import multiprocessing
 import logging
 import logging.config
 
@@ -56,8 +58,16 @@ class Greeter(GreeterServicer):
         yield HelloReply(message="Hello, world!")
 
 
-server = Server(50055)
-server.add_service(Greeter().service)
-
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--num_processes", default=0, type=int)
+    args = parser.parse_args()
+
+    if args.num_processes == 0:
+        num_processes = multiprocessing.cpu_count()
+    else:
+        num_processes = args.num_processes
+
+    server = Server(50055, num_processes=num_processes)
+    server.add_service(Greeter().service)
     server.serve()

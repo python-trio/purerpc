@@ -1,5 +1,3 @@
-import faulthandler
-faulthandler.enable()
 from setuptools import setup, find_packages
 
 
@@ -21,7 +19,6 @@ def main():
             "objgraph",
             "h2",
             "protobuf",
-            "python-snappy",
             "curio~=0.9.0",
         ],
         entry_points={'console_scripts': console_scripts},
