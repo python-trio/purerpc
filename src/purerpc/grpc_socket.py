@@ -14,7 +14,7 @@ from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
 
 class SocketWrapper:
     def __init__(self, grpc_connection: GRPCConnection, sock: curio.io.Socket):
-        # self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._socket = sock
         self._grpc_connection = grpc_connection
         self._write_fifo_lock = curio.Lock()
@@ -149,7 +149,7 @@ class GRPCSocket:
     StreamClass = GRPCStream
 
     def __init__(self, config: GRPCConfiguration, sock: curio.io.Socket,
-                 receive_buffer_size=65536):
+                 receive_buffer_size=16384):
         self._grpc_connection = GRPCConnection(config=config)
         self._socket = SocketWrapper(self._grpc_connection, sock)
         self._receive_buffer_size = receive_buffer_size
