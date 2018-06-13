@@ -1,5 +1,3 @@
-import faulthandler
-faulthandler.enable()
 from setuptools import setup, find_packages
 
 

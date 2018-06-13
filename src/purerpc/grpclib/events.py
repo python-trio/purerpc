@@ -92,9 +92,10 @@ class RequestReceived(Event):
 
 
 class MessageReceived(Event):
-    def __init__(self, stream_id: int, data: bytes):
+    def __init__(self, stream_id: int, data: bytes, flow_controlled_length: int):
         self.stream_id = stream_id
         self.data = data
+        self.flow_controlled_length = flow_controlled_length
 
 
 class RequestEnded(Event):
