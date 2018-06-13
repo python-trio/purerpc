@@ -76,7 +76,7 @@ class Server:
 
     def _target_fn(self):
         socket = self._create_socket_and_listen()
-        curio.run(self._run_async_server, socket, with_monitor=True)
+        curio.run(self._run_async_server, socket)
 
     def serve(self):
         if self.num_processes == 1:
