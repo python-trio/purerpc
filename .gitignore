@@ -105,3 +105,6 @@ ENV/
 .idea
 
 .vscode
+
+# PyTests
+.pytest_cache

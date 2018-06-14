@@ -15,14 +15,16 @@ def main():
         python_requires=">=3.6.0",
         install_requires=[
             "autopep8",
-            "grpcio_tools",
             "objgraph",
             "h2",
             "protobuf",
             "curio~=0.9.0",
         ],
         entry_points={'console_scripts': console_scripts},
+        setup_requires=["pytest-runner"],
         tests_require=[
+            "pytest",
+            "grpcio_tools",
             "grpcio"
         ]
     )

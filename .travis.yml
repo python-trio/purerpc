@@ -1,0 +1,14 @@
+sudo: required
+language: python
+services:
+  - docker
+
+python:
+  - "3.6"
+
+script:
+  - ./ci/build_wheel.sh
+  - ./ci/run_tests_in_docker.sh
+
+deploy:
+  - ./ci/upload_wheel.sh
