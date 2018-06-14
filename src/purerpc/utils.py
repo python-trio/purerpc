@@ -1,7 +1,6 @@
 import platform
 import curio
 import pdb
-import objgraph
 import math
 
 
@@ -20,6 +19,7 @@ def get_linux_kernel_version():
 
 async def print_memory_growth_statistics(interval_sec=10.0, set_pdb_trace_every=math.inf):
     num_iters = 0
+    import objgraph
     while True:
         num_iters += 1
         await curio.sleep(interval_sec)
