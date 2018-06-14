@@ -9,4 +9,10 @@ python:
 script:
   - ./ci/build_wheel.sh
   - ./ci/run_tests_in_docker.sh
-  - ./ci/upload_wheel.sh
+
+deploy:
+  provider: pypi
+  user: "$TWINE_USER"
+  password: "$TWINE_PASSWORD"
+  distributions: "sdist bdist_wheel"
+
