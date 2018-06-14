@@ -101,7 +101,7 @@ class ConnectionHandler:
         self.server = server
 
     async def request_received(self, stream: GRPCProtoStream):
-        await stream.start_response(stream.stream_id, "+proto")
+        await stream.start_response()
         event = await stream.receive_event()
 
         try:
@@ -157,4 +157,5 @@ class ConnectionHandler:
             logging.exception("Got exception in main dispatch loop")
         finally:
             # await task_group.join()
-            await self.grpc_socket.shutdown()
+            # await self.grpc_socket.shutdown()
+            pass
