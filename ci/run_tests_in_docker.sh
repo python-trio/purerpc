@@ -1,7 +1,10 @@
 #! /usr/bin/env bash
 
-# TODO: add python3.7-rc and pypy
-for image in python:3.6; do
-  docker run -it -v `pwd`:/project_root -w /project_root $image bash -c 'pip install dist/*.whl && python setup.py test' || exit -1;
-done
+set -e
 
+BASE_IMAGE="$1"
+BUILD_TAG=${BASE_IMAGE/:/-}
+echo $BUILD_TAG
+
+./ci/docker_build_template.sh "$BUILD_TAG" "$BASE_IMAGE"
+docker run -it standy/purerpc bash -c 'python setup.py test'
