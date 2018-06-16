@@ -16,10 +16,11 @@ fi
 
 BASE_IMAGE=${2}
 
-DOCKERFILE=$(mktemp /tmp/Dockerfile-XXXXXXXXX)
-sed 's,%BASE_IMAGE%,'${BASE_IMAGE}',g' ./ci/Dockerfile.template > ${DOCKERFILE}
+mkdir -p .dockerfiles
+DOCKERFILE="./.dockerfiles/${BASE_IMAGE}.dockerfile"
+sed 's,%BASE_IMAGE%,'${BASE_IMAGE}',g' ./ci/template.dockerfile > ${DOCKERFILE}
 
-echo "Building Dockerfile:"
+echo "Building dockerfile ${DOCKERFILE}:"
 cat ${DOCKERFILE}
 
 docker build -t ${BUILD_IMAGE_NAME}${BUILD_IMAGE_TAG} -f ${DOCKERFILE} .
