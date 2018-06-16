@@ -15,4 +15,5 @@ deploy:
   user: "$TWINE_USER"
   password: "$TWINE_PASSWORD"
   distributions: "sdist bdist_wheel"
-
+  on:
+    tags: true
