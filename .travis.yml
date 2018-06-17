@@ -4,6 +4,10 @@ python:
   - "3.6"
 services:
   - docker
+stages:
+  - test
+  - name: deploy
+    if: tag IS present AND type != pull_request
 env:
   - PYTHON_IMAGE="python:3.6"
   - PYTHON_IMAGE="python:3.7-rc"
@@ -14,7 +18,7 @@ script:
 jobs:
   include:
     - stage: deploy
-      skript: skip
+      script: skip
       deploy:
         provider: pypi
         user: "$TWINE_USER"
