@@ -1,18 +1,11 @@
 import os
 import sys
-import autopep8
-from collections import defaultdict
+import itertools
 
 from google.protobuf.compiler.plugin_pb2 import CodeGeneratorRequest
 from google.protobuf.compiler.plugin_pb2 import CodeGeneratorResponse
 from google.protobuf import descriptor_pb2
-from purerpc.rpc import Cardinality
-import itertools
-
-IMPORT_STRINGS = """import purerpc.server
-import purerpc.client
-from purerpc.rpc import Cardinality, RPCSignature
-"""
+from purerpc import Cardinality
 
 
 def get_python_package(proto_name):
@@ -34,53 +27,63 @@ def get_python_type(proto_name, proto_type):
 
 def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                           proto_for_entity):
-    contents = IMPORT_STRINGS
-    contents += "import {}\n".format(get_python_package(proto_file.name))
+    lines = ["import purerpc"]
+    lines.append(f"import {get_python_package(proto_file.name)}")
     for dep_module in proto_file.dependency:
-        contents += "import {}\n".format(get_python_package(dep_module))
+        lines.append(f"import {get_python_package(dep_module)}")
     for service in proto_file.service:
         if proto_file.package:
             fully_qualified_service_name = proto_file.package + "." + service.name
         else:
             fully_qualified_service_name = service.name
-        contents += "\n\nclass {}Servicer(purerpc.server.Servicer):\n".format(service.name)
+
+        lines.append(f"\n\nclass {service.name}Servicer(purerpc.Servicer):")
         for method in service.method:
-            contents += "    async def {}(self, input_message{}):\n".format(
-                method.name, "s" if method.client_streaming else "")
-            contents += "        raise NotImplementedError()\n\n"
-        contents += "    @property\n"
-        contents += "    def service(self) -> purerpc.server.Service:\n"
-        contents += "        service_obj = purerpc.server.Service(\"{}\")\n".format(
-            fully_qualified_service_name)
+            plural_suffix = "s" if method.client_streaming else ""
+            lines.append(f"    async def {method.name}(self, input_message{plural_suffix}):")
+            lines.append("        raise NotImplementedError()\n")
+        lines.append("    @property")
+        lines.append("    def service(self) -> purerpc.Service:")
+        lines.append("        service_obj = purerpc.Service(")
+        lines.append(f"            \"{fully_qualified_service_name}\"")
+        lines.append("        )")
         for method in service.method:
+            input_proto = proto_for_entity[method.input_type]
+            output_proto = proto_for_entity[method.output_type]
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
-            contents += ("        service_obj.add_method(\"{}\", self.{}, "
-                         "RPCSignature({}, {}, {}))\n".format(
-                             method.name, method.name, cardinality,
-                             get_python_type(proto_for_entity[method.input_type],
-                                             method.input_type),
-                             get_python_type(proto_for_entity[method.output_type],
-                                             method.output_type)))
-        contents += "        return service_obj\n\n\n"
+            lines.append("        service_obj.add_method(")
+            lines.append(f"            \"{method.name}\",")
+            lines.append(f"            self.{method.name},")
+            lines.append("            purerpc.RPCSignature(")
+            lines.append(f"                purerpc.{cardinality},")
+            lines.append(f"                {get_python_type(input_proto, method.input_type)},")
+            lines.append(f"                {get_python_type(output_proto, method.output_type)},")
+            lines.append("            )")
+            lines.append("        )")
+        lines.append("        return service_obj\n\n")
 
-        contents += "class {}Stub:\n".format(service.name)
-        contents += "    def __init__(self, channel):\n"
-        contents += "        self._client = purerpc.client.Client(\"{}\", channel)\n".format(
-            fully_qualified_service_name)
+        lines.append(f"class {service.name}Stub:")
+        lines.append("    def __init__(self, channel):")
+        lines.append("        self._client = purerpc.Client(")
+        lines.append(f"            \"{fully_qualified_service_name}\",")
+        lines.append("            channel")
+        lines.append("        )")
         for method in service.method:
+            input_proto = proto_for_entity[method.input_type]
+            output_proto = proto_for_entity[method.output_type]
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
-            contents += ("        self.{} = self._client.get_method_stub("
-                         "\"{}\", RPCSignature({}, {}, {}))\n".format(
-                             method.name, method.name, cardinality,
-                             get_python_type(proto_for_entity[method.input_type],
-                                             method.input_type),
-                             get_python_type(proto_for_entity[method.output_type],
-                                             method.output_type)))
-        contents += "\n\n"
+            lines.append(f"        self.{method.name} = self._client.get_method_stub(")
+            lines.append(f"            \"{method.name}\",")
+            lines.append("            purerpc.RPCSignature(")
+            lines.append(f"                purerpc.{cardinality},")
+            lines.append(f"                {get_python_type(input_proto, method.input_type)},")
+            lines.append(f"                {get_python_type(output_proto, method.output_type)},")
+            lines.append("            )")
+            lines.append("        )")
 
-    return autopep8.fix_code(contents, options={"experimental": True, "max_line_length": 100})
+    return "\n".join(lines)
 
 
 def main():

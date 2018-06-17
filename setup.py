@@ -48,7 +48,6 @@ def main():
         test_suite="tests",
         python_requires=">=3.6.0",
         install_requires=[
-            "autopep8",
             "h2",
             "protobuf",
             "curio",
