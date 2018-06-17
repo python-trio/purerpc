@@ -1,5 +1,6 @@
 import enum
 import typing
+import collections
 
 
 Stream = typing.AsyncIterator
@@ -43,14 +44,16 @@ class RPCSignature:
 
     @staticmethod
     def from_annotations(request_annotation, response_annotation):
-        if issubclass(request_annotation, Stream):
+        if (hasattr(request_annotation, "__origin__") and
+                issubclass(request_annotation.__origin__, collections.abc.AsyncIterator)):
             request_type = request_annotation.__args__[0]
             request_stream = True
         else:
             request_type = request_annotation
             request_stream = False
 
-        if issubclass(response_annotation, Stream):
+        if (hasattr(response_annotation, "__origin__") and
+                issubclass(response_annotation.__origin__, collections.abc.AsyncIterator)):
             response_type = response_annotation.__args__[0]
             response_stream = True
         else:

@@ -1,5 +1,7 @@
 sudo: required
-language: generic
+language: python
+python:
+  - "3.6"
 services:
   - docker
 env:
@@ -9,10 +11,14 @@ env:
 script:
   - ./ci/run_tests_in_docker.sh $PYTHON_IMAGE
 
-deploy:
-  provider: pypi
-  user: "$TWINE_USER"
-  password: "$TWINE_PASSWORD"
-  distributions: "sdist bdist_wheel"
-  on:
-    tags: true
+jobs:
+  include:
+    - stage: deploy
+      skript: skip
+      deploy:
+        provider: pypi
+        user: "$TWINE_USER"
+        password: "$TWINE_PASSWORD"
+        distributions: "sdist bdist_wheel"
+        on:
+          tags: true
