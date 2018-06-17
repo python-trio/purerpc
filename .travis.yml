@@ -11,6 +11,7 @@ stages:
 env:
   - PYTHON_IMAGE="python:3.6"
   - PYTHON_IMAGE="python:3.7-rc"
+  - PYTHON_IMAGE="standy/pypy:3.6-6.1.0"
 
 script:
   - ./ci/run_tests_in_docker.sh $PYTHON_IMAGE

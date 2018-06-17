@@ -17,7 +17,7 @@ fi
 BASE_IMAGE=${2}
 
 mkdir -p .dockerfiles
-DOCKERFILE="./.dockerfiles/${BASE_IMAGE}.dockerfile"
+DOCKERFILE="./.dockerfiles/${BUILD_IMAGE_TAG}.dockerfile"
 sed 's,%BASE_IMAGE%,'${BASE_IMAGE}',g' ./ci/template.dockerfile > ${DOCKERFILE}
 
 echo "Building dockerfile ${DOCKERFILE}:"
