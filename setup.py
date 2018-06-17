@@ -12,7 +12,7 @@ def main():
     console_scripts = ['protoc-gen-purerpc=purerpc.protoc_plugin.plugin:main']
     setup(
         name="purerpc",
-        version="0.1.2",
+        version="0.1.3",
         license="Apache License Version 2.0",
         description="Asynchronous pure python gRPC server and client implementation using curio "
                     "and hyper-h2.",
@@ -20,6 +20,7 @@ def main():
             re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.md')),
             re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read('CHANGELOG.md'))
         ),
+        long_description_content_type='text/markdown',
         author="Andrew Stepanov",
         url="https://github.com/standy66/purerpc",
         classifiers=[
