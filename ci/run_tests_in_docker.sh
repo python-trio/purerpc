@@ -3,9 +3,8 @@
 set -e
 
 BASE_IMAGE="$1"
-BUILD_TAG=${BASE_IMAGE/:/-}
-BUILD_TAG=${BUILD_TAG/\//-}
-echo $BUILD_TAG
+BUILD_TAG=${BASE_IMAGE//:/-}
+BUILD_TAG=${BUILD_TAG//\//-}
 
-./ci/docker_build_template.sh "$BUILD_TAG" "$BASE_IMAGE"
+docker build --build-arg BASE_IMAGE=${BASE_IMAGE} -t "standy/purerpc:${BUILD_TAG}" .
 docker run -it "standy/purerpc:$BUILD_TAG" bash -c 'python setup.py test'

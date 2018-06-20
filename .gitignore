@@ -78,6 +78,3 @@ ENV/
 
 # PyTests
 .pytest_cache
-
-# Generated dockerfiles
-.dockerfiles

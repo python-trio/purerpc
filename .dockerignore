@@ -81,5 +81,3 @@
 
 # PyTests
 **/.pytest_cache
-
-# Generated dockerfiles
