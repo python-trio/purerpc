@@ -1,3 +1,7 @@
+## Release 0.1.4
+
+* Speed up protoc plugin
+
 ## Release 0.1.3 [PyPI only]
 
 * Fix long description on PyPI
