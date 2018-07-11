@@ -1,3 +1,7 @@
+## Release 0.1.5
+
+* Enforce SO_KEEPALIVE with small timeouts
+
 ## Release 0.1.4
 
 * Speed up protoc plugin

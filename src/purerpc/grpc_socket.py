@@ -5,6 +5,7 @@ import datetime
 import collections
 import h2
 import h2.events
+from purerpc.utils import is_darwin
 from purerpc.grpclib.exceptions import ProtocolError
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
@@ -14,6 +15,15 @@ from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
 
 class SocketWrapper:
     def __init__(self, grpc_connection: GRPCConnection, sock: curio.io.Socket):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        if hasattr(socket, "TCP_KEEPIDLE"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
+        elif is_darwin():
+            # Darwin specific option
+            TCP_KEEPALIVE = 16
+            sock.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._socket = sock
         self._grpc_connection = grpc_connection

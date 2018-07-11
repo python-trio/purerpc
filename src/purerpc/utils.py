@@ -8,6 +8,10 @@ def is_linux():
     return platform.system() == "Linux"
 
 
+def is_darwin():
+    return platform.system() == "Darwin"
+
+
 def get_linux_kernel_version():
     if not is_linux():
         return None

@@ -12,7 +12,7 @@ def main():
     console_scripts = ['protoc-gen-purerpc=purerpc.protoc_plugin.plugin:main']
     setup(
         name="purerpc",
-        version="0.1.4",
+        version="0.1.5",
         license="Apache License Version 2.0",
         description="Asynchronous pure python gRPC server and client implementation using curio "
                     "and hyper-h2.",
