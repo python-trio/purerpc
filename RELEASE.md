@@ -1,6 +1,7 @@
 ## Release 0.1.5
 
 * Enforce SO_KEEPALIVE with small timeouts
+* Expose PureRPCTestCase in purerpc API for unit testing purerpc services
 
 ## Release 0.1.4
 

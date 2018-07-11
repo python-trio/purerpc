@@ -6,9 +6,9 @@ import subprocess
 import purerpc
 import tempfile
 import shutil
-import grpc
 import os
 import sys
+import inspect
 import importlib
 import concurrent.futures
 import logging
@@ -51,6 +51,7 @@ class PureRPCTestCase(unittest.TestCase):
     def run_grpc_service_in_process(self, add_handler_fn):
         queue = multiprocessing.Queue()
         def target_fn():
+            import grpc
             server = grpc.server(concurrent.futures.ThreadPoolExecutor(max_workers=8))
             port = server.add_insecure_port('[::]:0')
             add_handler_fn(server)
@@ -108,7 +109,9 @@ class PureRPCTestCase(unittest.TestCase):
             sys.path.insert(0, temp_dir)
             try:
                 for relative_proto_path in relative_proto_paths:
-                    proto_path = os.path.join(os.path.dirname(__file__), relative_proto_path)
+                    proto_path = os.path.join(os.path.dirname(
+                        inspect.currentframe().f_back.f_back.f_globals['__file__']),
+                        relative_proto_path)
                     proto_filename = os.path.basename(proto_path)
                     proto_temp_path = os.path.join(temp_dir, proto_filename)
                     shutil.copyfile(proto_path, proto_temp_path)

@@ -6,7 +6,7 @@ import time
 from .greeter_pb2 import HelloReply, HelloRequest
 from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
 from purerpc import Service, Stream, Channel, Client
-from .test_case_base import PureRPCTestCase
+from purerpc.test_utils import PureRPCTestCase
 
 
 class TestClientServerSimple(PureRPCTestCase):

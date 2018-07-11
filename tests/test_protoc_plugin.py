@@ -1,6 +1,6 @@
 import purerpc
 import purerpc.server
-from .test_case_base import PureRPCTestCase
+from purerpc.test_utils import PureRPCTestCase
 
 
 class TestProtocPlugin(PureRPCTestCase):
