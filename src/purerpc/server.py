@@ -2,6 +2,7 @@ import sys
 import inspect
 import warnings
 import collections
+import functools
 from multiprocessing import Process
 
 import curio
@@ -9,6 +10,7 @@ import curio.meta
 import typing
 import logging
 
+from .grpclib.events import RequestReceived
 from .grpclib.status import Status, StatusCode
 from .grpclib.exceptions import RpcFailedError
 from purerpc.grpc_proto import GRPCProtoStream, GRPCProtoSocket
@@ -29,24 +31,37 @@ class Service:
         self.name = name
         self.methods = {}
 
-    def add_method(self, method_name: str, method_fn, rpc_signature: RPCSignature):
-        self.methods[method_name] = BoundRPCMethod(method_fn, rpc_signature)
+    def add_method(self, method_name: str, method_fn, rpc_signature: RPCSignature,
+                   method_signature: inspect.Signature = None):
+        if method_signature is None:
+            method_signature = inspect.signature(method_fn)
+        if len(method_signature.parameters) == 1:
+            def method_fn_with_headers(arg, request):
+                return method_fn(arg)
+        elif len(method_signature.parameters) == 2:
+            if list(method_signature.parameters.values())[1].name == "request":
+                method_fn_with_headers = method_fn
+            else:
+                raise ValueError("Expected second parameter 'request'")
+        else:
+            raise ValueError("Expected method_fn to have exactly one or two parameters")
+        self.methods[method_name] = BoundRPCMethod(method_fn_with_headers, rpc_signature)
 
     def rpc(self, method_name):
         def decorator(func):
             signature = inspect.signature(func)
             if signature.return_annotation == signature.empty:
                 raise ValueError("Only annotated methods can be used with Service.rpc() decorator")
-            if len(signature.parameters) != 1:
-                raise ValueError("Only functions with one parameter can be used with Service.rpc("
-                                 ") decorator")
+            if len(signature.parameters) not in (1, 2):
+                raise ValueError("Only functions with one or two parameters can be used with "
+                                 "Service.rpc() decorator")
             parameter = next(iter(signature.parameters.values()))
             if parameter.annotation == parameter.empty:
                 raise ValueError("Only annotated methods can be used with Service.rpc() decorator")
 
             rpc_signature = RPCSignature.from_annotations(parameter.annotation,
                                                           signature.return_annotation)
-            self.add_method(method_name, func, rpc_signature)
+            self.add_method(method_name, func, rpc_signature, method_signature=signature)
             return func
         return decorator
 
@@ -104,6 +119,10 @@ class ConnectionHandler:
         await stream.start_response()
         event = await stream.receive_event()
 
+        if not isinstance(event, RequestReceived):
+            await stream.close(Status(StatusCode.INTERNAL, status_message="Expected headers"))
+            return
+
         try:
             service = self.server.services[event.service_name]
         except KeyError:
@@ -125,7 +144,7 @@ class ConnectionHandler:
 
         # TODO: Should at least pass through GeneratorExit
         try:
-            method_fn = bound_rpc_method.method_fn
+            method_fn = functools.partial(bound_rpc_method.method_fn, request=event)
             cardinality = bound_rpc_method.signature.cardinality
             stream.expect_message_type(bound_rpc_method.signature.request_type)
             if cardinality == Cardinality.STREAM_STREAM:

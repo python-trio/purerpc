@@ -80,40 +80,40 @@ class ClientStub:
 
 
 class ClientStubUnaryUnary(ClientStub):
-    async def __call__(self, message):
-        stream = await self._stream_fn()
+    async def __call__(self, message, *, metadata=None):
+        stream = await self._stream_fn(metadata=metadata)
         await send_single_message_client(stream, message)
         return await extract_message_from_singleton_stream(stream)
 
 
 class ClientStubUnaryStream(ClientStub):
-    async def __call__(self, message):
-        stream = await self._stream_fn()
+    async def __call__(self, message, *, metadata=None):
+        stream = await self._stream_fn(metadata=metadata)
         await send_single_message_client(stream, message)
         async for message in stream_to_async_iterator(stream):
             yield message
 
 
 class ClientStubStreamUnary(ClientStub):
-    async def __call__(self, message_aiter):
-        stream = await self._stream_fn()
+    async def __call__(self, message_aiter, *, metadata=None):
+        stream = await self._stream_fn(metadata=metadata)
         await curio.spawn(send_multiple_messages_client, stream, message_aiter, daemon=True)
         return await extract_message_from_singleton_stream(stream)
 
 
 class ClientStubStreamStream(ClientStub):
-    async def call_aiter(self, message_aiter):
-        stream = await self._stream_fn()
+    async def call_aiter(self, message_aiter, metadata):
+        stream = await self._stream_fn(metadata=metadata)
         if message_aiter is not None:
             await curio.spawn(send_multiple_messages_client, stream, message_aiter, daemon=True)
             async for message in stream_to_async_iterator(stream):
                 yield message
 
-    async def call_stream(self):
-        return await self._stream_fn()
+    async def call_stream(self, metadata):
+        return await self._stream_fn(metadata=metadata)
 
-    def __call__(self, message_aiter=None):
+    def __call__(self, message_aiter=None, *, metadata=None):
         if message_aiter is None:
-            return self.call_stream()
+            return self.call_stream(metadata)
         else:
-            return self.call_aiter(message_aiter)
+            return self.call_aiter(message_aiter, metadata)

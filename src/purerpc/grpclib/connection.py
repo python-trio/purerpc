@@ -8,6 +8,7 @@ import h2.connection
 import h2.exceptions
 from h2.settings import SettingCodes
 
+from .headers import HeaderDict, sanitize_headers
 from .status import Status
 from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded
@@ -75,13 +76,13 @@ class GRPCConnection:
         if event.stream_ended:
             raise ProtocolError("Stream ended before data was sent")
         request = RequestReceived.parse_from_stream_id_and_headers_destructive(
-            event.stream_id, dict(event.headers))
+            event.stream_id, HeaderDict(event.headers))
         self.message_read_buffers[event.stream_id] = MessageReadBuffer(request.message_encoding,
             self.config.max_message_length)
         return [request]
 
     def _response_received(self, event: h2.events.ResponseReceived):
-        headers = dict(event.headers)
+        headers = HeaderDict(event.headers)
         response_received = ResponseReceived.parse_from_stream_id_and_headers_destructive(
             event.stream_id, headers)
         if event.stream_ended:
@@ -97,7 +98,7 @@ class GRPCConnection:
 
     def _trailers_received(self, event: h2.events.TrailersReceived):
         response_ended = ResponseEnded.parse_from_stream_id_and_headers_destructive(
-            event.stream_id, dict(event.headers))
+            event.stream_id, HeaderDict(event.headers))
         return [response_ended]
 
     def _informational_response_received(self, event: h2.events.InformationalResponseReceived):
@@ -228,7 +229,6 @@ class GRPCConnection:
             (":path", "/{}/{}".format(service_name, method_name)),
             ("te", "trailers"),
             ("content-type", "application/grpc" + content_type_suffix),
-            *custom_metadata
         ]
         if authority is not None:
             headers.insert(3, (":authority", authority))
@@ -250,6 +250,7 @@ class GRPCConnection:
             headers.append(("grpc-accept-encoding", self.config._message_accept_encoding))
         if self.config._user_agent is not None:
             headers.append(("user-agent", self.config._user_agent))
+        headers.extend(sanitize_headers(custom_metadata))
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def end_request(self, stream_id: int):
@@ -259,12 +260,12 @@ class GRPCConnection:
         headers = [
             (":status", "200"),
             ("content-type", "application/grpc" + content_type_suffix),
-            *custom_metadata,
         ]
         if self.config._message_encoding is not None:
             headers.append(("grpc-encoding", self.config._message_encoding))
         if self.config._message_accept_encoding is not None:
             headers.append(("grpc-accept-encoding", self.config._message_accept_encoding))
+        headers.extend(sanitize_headers(custom_metadata))
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def respond_status(self, stream_id: int, status: Status, content_type_suffix="",
@@ -273,19 +274,19 @@ class GRPCConnection:
             (":status", "200"),
             ("content-type", "application/grpc" + content_type_suffix),
             ("grpc-status", str(status.int_value)),
-            *custom_metadata,
         ]
         if status.status_message:
             # TODO: should be percent encoded
             trailers.append(("grpc-message", status.status_message))
+        trailers.extend(sanitize_headers(custom_metadata))
         self.h2_connection.send_headers(stream_id, trailers, end_stream=True)
 
     def end_response(self, stream_id: int, status: Status, custom_metadata=()):
         trailers = [
             ("grpc-status", str(status.int_value)),
-            *custom_metadata,
         ]
         if status.status_message:
             # TODO: should be percent encoded
             trailers.append(("grpc-message", status.status_message))
+        trailers.extend(sanitize_headers(custom_metadata))
         self.h2_connection.send_headers(stream_id, trailers, end_stream=True)

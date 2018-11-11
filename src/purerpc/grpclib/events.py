@@ -1,5 +1,6 @@
-import base64
 import datetime
+
+from .headers import HeaderDict
 from .exceptions import ProtocolError
 from .status import Status
 
@@ -22,10 +23,10 @@ class RequestReceived(Event):
         self.message_encoding = None
         self.message_accept_encoding = None
         self.user_agent = None
-        self.custom_metadata = {}
+        self.custom_metadata = ()
 
     @staticmethod
-    def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: dict):
+    def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: HeaderDict):
         if headers.pop(":method") != "POST":
             raise ProtocolError("Unsupported method {}".format(headers[":method"]))
 
@@ -83,11 +84,8 @@ class RequestReceived(Event):
         if "grpc-message-type" in headers:
             event.message_type = headers.pop("grpc-message-type")
 
-        for header_name in list(headers.keys()):
-            if header_name.endswith("-bin"):
-                event.custom_metadata[header_name] = base64.b64decode(headers.pop(header_name))
-            else:
-                event.custom_metadata[header_name] = headers.pop(header_name)
+        event.custom_metadata = tuple(header for header_name in list(headers.keys())
+                                      for header in headers.extract_headers(header_name))
         return event
 
 
@@ -109,10 +107,10 @@ class ResponseReceived(Event):
         self.content_type = content_type
         self.message_encoding = None
         self.message_accept_encoding = None
-        self.custom_metadata = {}
+        self.custom_metadata = ()
 
     @staticmethod
-    def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: dict):
+    def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: HeaderDict):
         if int(headers.pop(":status")) != 200:
             raise ProtocolError("http status is not 200")
 
@@ -128,14 +126,8 @@ class ResponseReceived(Event):
         if "grpc-accept-encoding" in headers:
             event.message_accept_encoding = headers.pop("grpc-accept-encoding").split(",")
 
-        for header_name in list(headers.keys()):
-            if header_name in ["grpc-status", "grpc-message"]:
-                # is not metadata, will be parsed in ResponseEnded
-                continue
-            if header_name.endswith("-bin"):
-                event.custom_metadata[header_name] = base64.b64decode(headers.pop(header_name))
-            else:
-                event.custom_metadata[header_name] = headers.pop(header_name)
+        event.custom_metadata = tuple(header for header_name in list(headers.keys())
+                                      for header in headers.extract_headers(header_name))
         return event
 
 
@@ -143,10 +135,10 @@ class ResponseEnded(Event):
     def __init__(self, stream_id: int, status: Status):
         self.stream_id = stream_id
         self.status = status
-        self.custom_metadata = {}
+        self.custom_metadata = ()
 
     @staticmethod
-    def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: dict):
+    def parse_from_stream_id_and_headers_destructive(stream_id: int, headers: HeaderDict):
         if "grpc-status" not in headers:
             raise ProtocolError("Expected grpc-status in trailers")
 
@@ -159,9 +151,6 @@ class ResponseEnded(Event):
 
         event = ResponseEnded(stream_id, Status(status_code, status_message))
 
-        for header_name in list(headers.keys()):
-            if header_name.endswith("-bin"):
-                event.custom_metadata[header_name] = base64.b64decode(headers.pop(header_name))
-            else:
-                event.custom_metadata[header_name] = headers.pop(header_name)
+        event.custom_metadata = tuple(header for header_name in list(headers.keys())
+                                      for header in headers.extract_headers(header_name))
         return event

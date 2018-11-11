@@ -25,14 +25,17 @@ class Client:
         self.service_name = service_name
         self.channel = channel
 
-    async def rpc(self, method_name: str, request_type, response_type):
+    async def rpc(self, method_name: str, request_type, response_type, metadata=None):
         if self.channel.grpc_socket is None:
             await self.channel.connect()
         message_type = request_type.DESCRIPTOR.full_name
+        if metadata is None:
+            metadata = ()
         stream = await self.channel.grpc_socket.start_request("http", self.service_name,
                                                               method_name, message_type,
                                                               "{}:{}".format(self.channel.host,
-                                                                             self.channel.port))
+                                                                             self.channel.port),
+                                                              custom_metadata=metadata)
         stream.expect_message_type(response_type)
         return stream
 
