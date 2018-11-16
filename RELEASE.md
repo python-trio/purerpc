@@ -1,3 +1,8 @@
+## Release 0.1.6
+
+* Allow passing request headers to method handlers in request argument
+* Allow passing custom metadata to method stub calls (in metadata optional keyword argument)
+
 ## Release 0.1.5
 
 * Enforce SO_KEEPALIVE with small timeouts
