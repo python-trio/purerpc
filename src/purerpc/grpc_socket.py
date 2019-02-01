@@ -1,10 +1,11 @@
-import curio
+import sys
 import socket
-import curio.io
 import datetime
-import collections
+
+import anyio
 import h2
 import h2.events
+import h2.exceptions
 from purerpc.utils import is_darwin
 from purerpc.grpclib.exceptions import ProtocolError
 
@@ -14,21 +15,25 @@ from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
 
 
 class SocketWrapper:
-    def __init__(self, grpc_connection: GRPCConnection, sock: curio.io.Socket):
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    def __init__(self, grpc_connection: GRPCConnection, sock: anyio._networking.SocketStream):
+        self._set_raw_socket_options(sock._socket._raw_socket)
+        self._socket = sock._socket
+        self._grpc_connection = grpc_connection
+        self._write_fifo_lock = anyio.create_lock()
+        self._retry = False
+
+    @staticmethod
+    def _set_raw_socket_options(raw_socket):
+        raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         if hasattr(socket, "TCP_KEEPIDLE"):
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
+            raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
         elif is_darwin():
             # Darwin specific option
             TCP_KEEPALIVE = 16
-            sock.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self._socket = sock
-        self._grpc_connection = grpc_connection
-        self._write_fifo_lock = curio.Lock()
-        self._retry = False
+            raw_socket.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
+        raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
+        raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
+        raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     async def flush(self):
         """This maybe called from different threads."""
@@ -63,8 +68,8 @@ class GRPCStream:
         self._grpc_connection = grpc_connection
         self._grpc_socket = grpc_socket
         self._socket = socket
-        self._flow_control_update_event = curio.Event()
-        self._incoming_events = curio.Queue()
+        self._flow_control_update_event = anyio.create_event()
+        self._incoming_events = anyio.create_queue(sys.maxsize)
 
         self._response_started = False
         self._closed = False
@@ -81,14 +86,6 @@ class GRPCStream:
         return self._end_stream_event
 
     @property
-    def flow_control_update_event(self):
-        return self._flow_control_update_event
-
-    @property
-    def incoming_events(self):
-        return self._incoming_events
-
-    @property
     def stream_id(self):
         return self._stream_id
 
@@ -100,6 +97,13 @@ class GRPCStream:
     def debug_prefix(self):
         return "[CLIENT] " if self.client_side else "[SERVER] "
 
+    async def _set_flow_control_update(self):
+        await self._flow_control_update_event.set()
+
+    async def _wait_flow_control_update(self):
+        await self._flow_control_update_event.wait()
+        self._flow_control_update_event.clear()
+
     async def _send(self, message: bytes, compress=False):
         message_write_buffer = MessageWriteBuffer(self._grpc_connection.config.message_encoding,
                                                   self._grpc_connection.config.max_message_length)
@@ -107,8 +111,7 @@ class GRPCStream:
         while message_write_buffer:
             window_size = self._grpc_connection.flow_control_window(self._stream_id)
             if window_size <= 0:
-                await self._flow_control_update_event.wait()
-                self._flow_control_update_event.clear()
+                await self._wait_flow_control_update()
                 continue
             num_data_to_send = min(window_size, len(message_write_buffer))
             data = message_write_buffer.data_to_send(num_data_to_send)
@@ -136,7 +139,11 @@ class GRPCStream:
             raise TypeError("Closing already closed stream")
         self._closed = True
         if self.client_side:
-            self._grpc_connection.end_request(self._stream_id)
+            try:
+                self._grpc_connection.end_request(self._stream_id)
+            except h2.exceptions.StreamClosedError:
+                # Remote end already closed connection, do nothing here
+                pass
         elif self._response_started:
             self._grpc_connection.end_response(self._stream_id, status, custom_metadata)
         else:
@@ -158,7 +165,7 @@ class GRPCStream:
 class GRPCSocket:
     StreamClass = GRPCStream
 
-    def __init__(self, config: GRPCConfiguration, sock: curio.io.Socket,
+    def __init__(self, config: GRPCConfiguration, sock,
                  receive_buffer_size=16384):
         self._grpc_connection = GRPCConnection(config=config)
         self._socket = SocketWrapper(self._grpc_connection, sock)
@@ -197,9 +204,9 @@ class GRPCSocket:
                 if isinstance(event, h2.events.WindowUpdated):
                     if event.stream_id == 0:
                         for stream in self._streams.values():
-                            await stream.flow_control_update_event.set()
+                            await stream._set_flow_control_update()
                     elif event.stream_id in self._streams:
-                        await self._streams[event.stream_id].flow_control_update_event.set()
+                        await self._streams[event.stream_id]._set_flow_control_update()
                     continue
                 elif isinstance(event, RequestReceived):
                     self._allocate_stream(event.stream_id)
@@ -216,11 +223,11 @@ class GRPCSocket:
         async for _ in self._listen():
             raise ProtocolError("Received request on client end")
 
-    async def initiate_connection(self):
+    async def initiate_connection(self, parent_task_group: anyio.abc.TaskGroup):
         self._grpc_connection.initiate_connection()
         await self._socket.flush()
         if self.client_side:
-            await curio.spawn(self._listener_thread(), daemon=True)
+            await parent_task_group.spawn(self._listener_thread)
 
     async def listen(self):
         if self.client_side:

@@ -1,11 +1,11 @@
 import unittest
-import curio
+import anyio
 import grpc
 import typing
 import time
 from .greeter_pb2 import HelloReply, HelloRequest
 from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
-from purerpc import Service, Stream, Channel, Client
+from purerpc import Service, Stream, Client, insecure_channel
 from purerpc.test_utils import PureRPCTestCase
 
 
@@ -20,7 +20,7 @@ class TestClientServerSimple(PureRPCTestCase):
         @service.rpc("SayHelloGoodbye")
         async def say_hello_goodbye(message: HelloRequest) -> Stream[HelloReply]:
             yield HelloReply(message=f"Hello, {message.name}")
-            await curio.sleep(0.05)
+            await anyio.sleep(0.05)
             yield HelloReply(message=f"Goodbye, {message.name}")
 
         @service.rpc("SayHelloToManyAtOnce")
@@ -33,7 +33,7 @@ class TestClientServerSimple(PureRPCTestCase):
         @service.rpc("SayHelloToMany")
         async def say_hello_to_many(messages: Stream[HelloRequest]) -> Stream[HelloReply]:
             async for message in messages:
-                await curio.sleep(0.05)
+                await anyio.sleep(0.05)
                 yield HelloReply(message="Hello, " + message.name)
 
         with self.run_purerpc_service_in_process(service) as port:
@@ -134,12 +134,11 @@ class TestClientServerSimple(PureRPCTestCase):
                 await test_say_hello_to_many_at_once(client)
 
             async def main():
-                channel = Channel("localhost", port)
-                await channel.connect()
-                async with curio.TaskGroup() as task_group:
-                    for _ in range(50):
-                        await task_group.spawn(worker(channel))
-            curio.run(main)
+                async with insecure_channel("localhost", port) as channel:
+                    async with anyio.create_task_group() as task_group:
+                        for _ in range(25):
+                            await task_group.spawn(worker, channel)
+            anyio.run(main)
 
     def test_purerpc_server_purerpc_client(self):
         service = Service("Greeter")
@@ -151,7 +150,7 @@ class TestClientServerSimple(PureRPCTestCase):
         @service.rpc("SayHelloGoodbye")
         async def say_hello_goodbye(message: HelloRequest) -> Stream[HelloReply]:
             yield HelloReply(message=f"Hello, {message.name}")
-            await curio.sleep(0.05)
+            await anyio.sleep(0.05)
             yield HelloReply(message=f"Goodbye, {message.name}")
 
         @service.rpc("SayHelloToManyAtOnce")
@@ -164,7 +163,7 @@ class TestClientServerSimple(PureRPCTestCase):
         @service.rpc("SayHelloToMany")
         async def say_hello_to_many(messages: Stream[HelloRequest]) -> Stream[HelloReply]:
             async for message in messages:
-                await curio.sleep(0.05)
+                await anyio.sleep(0.05)
                 yield HelloReply(message="Hello, " + message.name)
 
         with self.run_purerpc_service_in_process(service) as port:
@@ -215,9 +214,8 @@ class TestClientServerSimple(PureRPCTestCase):
                 await test_say_hello_to_many_at_once(client)
 
             async def main():
-                channel = Channel("localhost", port)
-                await channel.connect()
-                async with curio.TaskGroup() as task_group:
-                    for _ in range(50):
-                        await task_group.spawn(worker(channel))
-            curio.run(main)
+                async with insecure_channel("localhost", port) as channel:
+                    async with anyio.create_task_group() as task_group:
+                        for _ in range(50):
+                            await task_group.spawn(worker, channel)
+            anyio.run(main)

@@ -1,5 +1,5 @@
 import unittest
-import curio
+import anyio
 import grpc
 import pickle
 import base64
@@ -7,8 +7,9 @@ import typing
 import time
 from .greeter_pb2 import HelloReply, HelloRequest
 from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
-from purerpc import Service, Stream, Channel, Client, RpcFailedError
 from purerpc.test_utils import PureRPCTestCase
+
+import purerpc
 
 
 class TestClientServerMetadata(PureRPCTestCase):
@@ -74,10 +75,9 @@ class TestClientServerMetadata(PureRPCTestCase):
 
 
             async def main():
-                channel = Channel("localhost", port)
-                await channel.connect()
-                await worker(channel)
-            curio.run(main)
+                async with purerpc.insecure_channel("localhost", port) as channel:
+                    await worker(channel)
+            anyio.run(main)
 
     def test_metadata_purerpc_server_purerpc_client(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
@@ -109,8 +109,7 @@ class TestClientServerMetadata(PureRPCTestCase):
                     self.assertEqual(metadata, received_metadata)
 
                 async def main():
-                    channel = Channel("localhost", port)
-                    await channel.connect()
-                    await worker(channel)
+                    async with purerpc.insecure_channel("localhost", port) as channel:
+                        await worker(channel)
 
-                curio.run(main)
+                anyio.run(main)

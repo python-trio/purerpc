@@ -1,7 +1,7 @@
 import unittest
 import threading
 import multiprocessing
-import curio
+import anyio
 import subprocess
 import purerpc
 import tempfile
@@ -34,7 +34,7 @@ class PureRPCTestCase(unittest.TestCase):
             queue.put(socket.getsockname()[1])
             queue.close()
             queue.join_thread()
-            curio.run(server._run_async_server, socket)
+            anyio.run(server._run_async_server, socket)
 
         process = multiprocessing.Process(target=target_fn)
         process.start()

@@ -1,6 +1,6 @@
 import grpc
-from greeter_pb2 import HelloRequest, HelloReply
-from greeter_pb2_grpc import GreeterStub
+from generated.greeter_pb2 import HelloRequest
+from generated.greeter_pb2_grpc import GreeterStub
 
 
 def main():

@@ -88,6 +88,10 @@ class RequestReceived(Event):
                                       for header in headers.extract_headers(header_name))
         return event
 
+    def __repr__(self):
+        return (f"<purerpc.grpclib.events.RequestReceived stream_id: {self.stream_id}, "\
+                f"service_name: {self.service_name}, method_name: {self.method_name}>")
+
 
 class MessageReceived(Event):
     def __init__(self, stream_id: int, data: bytes, flow_controlled_length: int):
@@ -95,10 +99,17 @@ class MessageReceived(Event):
         self.data = data
         self.flow_controlled_length = flow_controlled_length
 
+    def __repr__(self):
+        return (f"<purerpc.grpclib.events.MessageReceived stream_id: {self.stream_id}, "
+                f"flow_controlled_length: {self.flow_controlled_length}>")
+
 
 class RequestEnded(Event):
     def __init__(self, stream_id: int):
         self.stream_id = stream_id
+
+    def __repr__(self):
+        return f"<purerpc.grpclib.events.RequestEnded stream_id: {self.stream_id}>"
 
 
 class ResponseReceived(Event):
@@ -130,6 +141,9 @@ class ResponseReceived(Event):
                                       for header in headers.extract_headers(header_name))
         return event
 
+    def __repr__(self):
+        return f"<purerpc.grpclib.events.ResponseReceived stream_id: {self.stream_id} content_type: {self.content_type}>"
+
 
 class ResponseEnded(Event):
     def __init__(self, stream_id: int, status: Status):
@@ -154,3 +168,6 @@ class ResponseEnded(Event):
         event.custom_metadata = tuple(header for header_name in list(headers.keys())
                                       for header in headers.extract_headers(header_name))
         return event
+
+    def __repr__(self):
+        return f"<purerpc.grpclib.events.ResponseEnded stream_id: {self.stream_id}, status: {self.status}>"

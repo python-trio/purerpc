@@ -1,5 +1,5 @@
 import unittest
-import curio
+import anyio
 import grpc
 import typing
 import time
@@ -49,12 +49,11 @@ class TestStatusCodes(PureRPCTestCase):
             
             GreeterStub = grpc_module.GreeterStub
             async def main():
-                channel = Channel("localhost", port)
-                await channel.connect()
-                stub = GreeterStub(channel)
-                with self.assertRaises(UnimplementedError):
-                    await stub.SayHello(HelloRequest(name="World"))
-            curio.run(main)
+                async with insecure_channel("localhost", port) as channel:
+                    stub = GreeterStub(channel)
+                    with self.assertRaises(UnimplementedError):
+                        await stub.SayHello(HelloRequest(name="World"))
+            anyio.run(main)
 
     def test_purerpc_server_grpc_client_status_codes(self):
         def test(error_to_raise, regex_to_check):
@@ -101,12 +100,11 @@ class TestStatusCodes(PureRPCTestCase):
 
                 GreeterStub = grpc_module.GreeterStub
                 async def main():
-                    channel = Channel("localhost", port)
-                    await channel.connect()
-                    stub = GreeterStub(channel)
-                    with self.assertRaises(error_to_raise):
-                        await stub.SayHello(HelloRequest(name="World"))
-                curio.run(main)
+                    async with insecure_channel("localhost", port) as channel:
+                        stub = GreeterStub(channel)
+                        with self.assertRaises(error_to_raise):
+                            await stub.SayHello(HelloRequest(name="World"))
+                anyio.run(main)
 
         test(CancelledError, "CANCELLED")
         test(UnknownError, "UNKNOWN")

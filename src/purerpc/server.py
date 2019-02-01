@@ -1,12 +1,12 @@
 import sys
 import inspect
 import warnings
+import socket
 import collections
 import functools
 from multiprocessing import Process
 
-import curio
-import curio.meta
+import anyio
 import typing
 import logging
 
@@ -22,6 +22,7 @@ from purerpc.wrappers import stream_to_async_iterator, call_server_unary_unary, 
 
 from .grpclib.connection import GRPCConfiguration
 
+log = logging.getLogger(__name__)
 
 BoundRPCMethod = collections.namedtuple("BoundRPCMethod", ["method_fn", "signature"])
 
@@ -72,6 +73,29 @@ class Servicer:
         raise NotImplementedError()
 
 
+def tcp_server_socket(host, port, family=socket.AF_INET, backlog=100,
+                      reuse_address=True, reuse_port=False):
+
+    raw_socket = socket.socket(family, socket.SOCK_STREAM)
+    try:
+        if reuse_address:
+            raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+
+        if reuse_port:
+            try:
+                raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, True)
+            except (AttributeError, OSError) as e:
+                log.warning('reuse_port=True option failed', exc_info=True)
+
+        raw_socket.bind((host, port))
+        raw_socket.listen(backlog)
+    except Exception:
+        raw_socket.close()
+        raise
+
+    return raw_socket
+
+
 class Server:
     def __init__(self, port=50055, num_processes=1):
         self.port = port
@@ -84,14 +108,20 @@ class Server:
         self.services[service.name] = service
 
     def _create_socket_and_listen(self):
-        return curio.tcp_server_socket('', self.port, reuse_address=True, reuse_port=True)
+        return tcp_server_socket('', self.port, reuse_address=True, reuse_port=True)
 
-    async def _run_async_server(self, socket):
-        await curio.network.run_server(socket, lambda c, a: ConnectionHandler(self)(c, a))
+    async def _run_async_server(self, raw_socket):
+        socket = anyio._get_asynclib().Socket(raw_socket)
+
+        # TODO: resource usage warning
+        async with anyio._networking.SocketStreamServer(socket, None, False, False) as tcp_server, \
+                                                                anyio.create_task_group() as task_group:
+            async for socket in tcp_server.accept_connections():
+                await task_group.spawn(ConnectionHandler(self), socket)
 
     def _target_fn(self):
         socket = self._create_socket_and_listen()
-        curio.run(self._run_async_server, socket)
+        anyio.run(self._run_async_server, socket)
 
     def serve(self):
         if self.num_processes == 1:
@@ -161,20 +191,17 @@ class ConnectionHandler:
             logging.exception("Got exception while writing response stream")
             await stream.close(Status(StatusCode.CANCELLED, status_message=repr(sys.exc_info())))
 
-    async def __call__(self, socket, addr):
+    async def __call__(self, socket):
         self.grpc_socket = GRPCProtoSocket(self.config, socket)
-        await self.grpc_socket.initiate_connection()
+        await self.grpc_socket.initiate_connection(None)
 
+        # TODO: resource usage warning
         # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
         # TODO: do we really need it here?
-        # task_group = curio.TaskGroup()
-        # TODO: Should at least pass through GeneratorExit
-        try:
-            async for stream in self.grpc_socket.listen():
-                await curio.spawn(self.request_received(stream), daemon=True)
-        except:
-            logging.exception("Got exception in main dispatch loop")
-        finally:
-            # await task_group.join()
-            # await self.grpc_socket.shutdown()
-            pass
+        async with anyio.create_task_group() as task_group:
+            # TODO: Should at least pass through GeneratorExit
+            try:
+                async for stream in self.grpc_socket.listen():
+                    await task_group.spawn(self.request_received, stream)
+            except:
+                logging.exception("Got exception in main dispatch loop")

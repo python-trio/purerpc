@@ -1,4 +1,5 @@
 import purerpc
+import unittest.mock
 import purerpc.server
 from purerpc.test_utils import PureRPCTestCase
 
@@ -22,7 +23,7 @@ class TestProtocPlugin(PureRPCTestCase):
             self.assertTrue(isinstance(GreeterServicer().service, purerpc.Service))
 
             GreeterStub = grpc_module.GreeterStub
-            channel = purerpc.Channel("localhost", 0)
+            channel = unittest.mock.MagicMock()
             greeter_stub = GreeterStub(channel)
             self.assertIn("SayHello", dir(greeter_stub))
             self.assertTrue(callable(greeter_stub.SayHello))

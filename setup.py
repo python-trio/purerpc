@@ -50,7 +50,8 @@ def main():
         install_requires=[
             "h2",
             "protobuf",
-            "curio",
+            "anyio",
+            "async_exit_stack"
         ],
         entry_points={'console_scripts': console_scripts},
         setup_requires=["pytest-runner"],

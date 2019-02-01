@@ -1,6 +1,4 @@
-import random
 import collections
-from purerpc.grpclib.message_buffer import ByteBuffer
 
 
 class ByteBuffer:
@@ -89,7 +87,7 @@ class ByteBufferV2:
 
 
 def main():
-    from purerpc.grpclib.message_buffer import ByteBuffer
+    from purerpc.grpclib.buffers import ByteBuffer
     b = b"\x00" * 50
     x = ByteBuffer()
     for i in range(5000000):

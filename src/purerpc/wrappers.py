@@ -1,4 +1,4 @@
-import curio.meta
+import anyio
 from .grpclib.exceptions import ProtocolError, raise_status
 from .grpclib.status import Status, StatusCode
 from purerpc.grpc_proto import GRPCProtoStream
@@ -29,7 +29,7 @@ async def stream_to_async_iterator(stream: GRPCProtoStream):
 
 
 async def send_multiple_messages_server(stream, agen):
-    async with curio.meta.finalize(agen) as tmp:
+    async with anyio.finalize(agen) as tmp:
         async for message in tmp:
             await stream.send_message(message)
     await stream.close(Status(StatusCode.OK))
@@ -42,7 +42,7 @@ async def send_single_message_server(stream, message):
 
 async def send_multiple_messages_client(stream, agen):
     try:
-        async with curio.meta.finalize(agen) as tmp:
+        async with anyio.finalize(agen) as tmp:
             async for message in tmp:
                 await stream.send_message(message)
     finally:
@@ -75,8 +75,9 @@ async def call_server_stream_stream(func, stream):
 
 
 class ClientStub:
-    def __init__(self, stream_fn):
+    def __init__(self, stream_fn, parent_task_group):
         self._stream_fn = stream_fn
+        self._parent_task_group = parent_task_group
 
 
 class ClientStubUnaryUnary(ClientStub):
@@ -97,7 +98,7 @@ class ClientStubUnaryStream(ClientStub):
 class ClientStubStreamUnary(ClientStub):
     async def __call__(self, message_aiter, *, metadata=None):
         stream = await self._stream_fn(metadata=metadata)
-        await curio.spawn(send_multiple_messages_client, stream, message_aiter, daemon=True)
+        await self._parent_task_group.spawn(send_multiple_messages_client, stream, message_aiter)
         return await extract_message_from_singleton_stream(stream)
 
 
@@ -105,7 +106,7 @@ class ClientStubStreamStream(ClientStub):
     async def call_aiter(self, message_aiter, metadata):
         stream = await self._stream_fn(metadata=metadata)
         if message_aiter is not None:
-            await curio.spawn(send_multiple_messages_client, stream, message_aiter, daemon=True)
+            await self._parent_task_group.spawn(send_multiple_messages_client, stream, message_aiter)
             async for message in stream_to_async_iterator(stream):
                 yield message
 

@@ -5,8 +5,8 @@ import contextlib
 import multiprocessing
 
 import purerpc
-from greeter_pb2 import HelloRequest, HelloReply
-from greeter_grpc import GreeterServicer, GreeterStub
+from generated.greeter_pb2 import HelloRequest, HelloReply
+from generated.greeter_grpc import GreeterServicer, GreeterStub
 
 
 @contextlib.contextmanager
@@ -68,28 +68,27 @@ async def do_load_stream(stub, num_requests, message_size):
 
 async def worker(port, queue, num_concurrent_streams, num_requests_per_stream,
                  num_rounds, message_size, load_type):
-    channel = purerpc.Channel("localhost", port)
-    await channel.connect()
-    stub = GreeterStub(channel)
-    if load_type == "unary":
-        load_fn = do_load_unary
-    elif load_type == "stream":
-        load_fn = do_load_stream
-    else:
-        raise ValueError(f"Unknown load type: {load_type}")
-    for _ in range(num_rounds):
-        tasks = []
-        start = time.time()
-        async with curio.TaskGroup() as task_group:
-            for _ in range(num_concurrent_streams):
-                task = await task_group.spawn(load_fn(stub, num_requests_per_stream, message_size))
-                tasks.append(task)
-        end = time.time()
-        rps = num_concurrent_streams * num_requests_per_stream / (end - start)
-        queue.put(rps)
-        queue.put([task.result for task in tasks])
-    queue.close()
-    queue.join_thread()
+    async with purerpc.insecure_channel("localhost", port) as channel:
+        stub = GreeterStub(channel)
+        if load_type == "unary":
+            load_fn = do_load_unary
+        elif load_type == "stream":
+            load_fn = do_load_stream
+        else:
+            raise ValueError(f"Unknown load type: {load_type}")
+        for _ in range(num_rounds):
+            tasks = []
+            start = time.time()
+            async with curio.TaskGroup() as task_group:
+                for _ in range(num_concurrent_streams):
+                    task = await task_group.spawn(load_fn(stub, num_requests_per_stream, message_size))
+                    tasks.append(task)
+            end = time.time()
+            rps = num_concurrent_streams * num_requests_per_stream / (end - start)
+            queue.put(rps)
+            queue.put([task.result for task in tasks])
+        queue.close()
+        queue.join_thread()
 
 
 if __name__ == "__main__":
@@ -97,7 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--message_size", type=int, default=1000)
     parser.add_argument("--num_workers", type=int, default=3)
     parser.add_argument("--num_concurrent_streams", type=int, default=100)
-    parser.add_argument("--num_requests_per_stream", type=int, default=100)
+    parser.add_argument("--num_requests_per_stream", type=int, default=50)
     parser.add_argument("--num_rounds", type=int, default=10)
     parser.add_argument("--load_type", choices=["unary", "stream"], required=True)
 
