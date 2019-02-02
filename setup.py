@@ -51,12 +51,15 @@ def main():
             "h2",
             "protobuf",
             "anyio",
-            "async_exit_stack"
+            "async_exit_stack",
+            "tblib",
         ],
         entry_points={'console_scripts': console_scripts},
         setup_requires=["pytest-runner"],
         tests_require=[
             "pytest",
+            "pytest-xdist",
+            "pytest-forked",
             "grpcio_tools",
             "grpcio"
         ]
