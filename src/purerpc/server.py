@@ -119,18 +119,18 @@ class Server:
             async for socket in tcp_server.accept_connections():
                 await task_group.spawn(ConnectionHandler(self), socket)
 
-    def _target_fn(self):
+    def _target_fn(self, backend):
         socket = self._create_socket_and_listen()
-        anyio.run(self._run_async_server, socket)
+        anyio.run(self._run_async_server, socket, backend=backend)
 
-    def serve(self):
+    def serve(self, backend="asyncio"):
         if self.num_processes == 1:
-            self._target_fn()
+            self._target_fn(backend)
         else:
             # this is simple SO_REUSEPORT load balancing on Linux
             processes = []
             for i in range(self.num_processes):
-                process = Process(target=self._target_fn)
+                process = Process(target=self._target_fn, args=(backend,))
                 process.start()
                 processes.append(process)
             for process in processes:
