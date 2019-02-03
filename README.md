@@ -2,8 +2,10 @@
 
 [![Build Status](https://travis-ci.org/standy66/purerpc.png?branch=master)](https://travis-ci.org/standy66/purerpc)
 
-Asynchronous pure Python gRPC server and client implementation using
-[curio](https://github.com/dabeaz/curio) and [hyper-h2](https://github.com/python-hyper/hyper-h2)
+Asynchronous pure Python gRPC server and client implementation supporting
+[asyncio](https://docs.python.org/3/library/asyncio.html),
+[curio](https://github.com/dabeaz/curio) and
+[trio](https://github.com/python-trio/trio).
 
 ## Requirements
 
@@ -23,6 +25,8 @@ Latest development version:
 ```bash
 pip install git+https://github.com/standy66/purerpc.git
 ```
+
+By default purerpc uses asyncio event loop, if you want to use curio or trio, please install them manually.
 
 ## protoc plugin
 
@@ -62,16 +66,16 @@ class Greeter(GreeterServicer):
 
 server = Server(50055)
 server.add_service(Greeter().service)
-server.serve()
+server.serve(backend="asyncio")
 ```
 
 ### Client
 
 ```python
 import curio
+import purerpc
 from greeter_pb2 import HelloRequest, HelloReply
 from greeter_grpc import GreeterStub
-from purerpc import Channel
 
 
 async def gen():
@@ -80,22 +84,19 @@ async def gen():
 
 
 async def main():
-    channel = Channel("localhost", 50055)
-    # This is optional, will be run automatically on the first request
-    await channel.connect()
-    stub = GreeterStub(channel)
-
-    reply = await stub.SayHello(HelloRequest(name="World"))
-    print(reply.message)
-
-    async for reply in stub.SayHelloToMany(gen()):
+    async with purerpc.insecure_channel("localhost", 50055) as channel:
+        stub = GreeterStub(channel)
+        reply = await stub.SayHello(HelloRequest(name="World"))
         print(reply.message)
+
+        async for reply in stub.SayHelloToMany(gen()):
+            print(reply.message)
 
 
 if __name__ == "__main__":
-    curio.run(main)
+    curio.run(main)  # Or trio.run(main)
 ```
 
-You can mix server and client code, for example make a server that requests something using purerpc from another server, etc.
+You can mix server and client code, for example make a server that requests something using purerpc from another gRPC server, etc.
 
 More examples in `misc/` folder
