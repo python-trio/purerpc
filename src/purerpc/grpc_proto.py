@@ -1,6 +1,5 @@
 import datetime
 
-import curio.io
 from purerpc.grpclib.config import GRPCConfiguration
 from purerpc.grpclib.events import MessageReceived, RequestEnded, ResponseEnded
 

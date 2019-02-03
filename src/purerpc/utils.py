@@ -1,5 +1,5 @@
 import platform
-import curio
+import anyio
 import pdb
 import math
 
@@ -26,7 +26,7 @@ async def print_memory_growth_statistics(interval_sec=10.0, set_pdb_trace_every=
     import objgraph
     while True:
         num_iters += 1
-        await curio.sleep(interval_sec)
+        await anyio.sleep(interval_sec)
         objgraph.show_growth()
         if num_iters == set_pdb_trace_every:
             pdb.set_trace()

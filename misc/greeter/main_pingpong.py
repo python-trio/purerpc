@@ -1,11 +1,9 @@
 import logging
 import logging.config
 
-import curio
-
 from purerpc.server import Service, Server
 from purerpc.rpc import Stream
-from greeter_pb2 import HelloRequest, HelloReply
+from generated.greeter_pb2 import HelloRequest, HelloReply
 
 
 def configure_logs(log_file=None):

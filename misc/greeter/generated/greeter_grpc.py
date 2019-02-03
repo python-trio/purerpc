@@ -1,5 +1,5 @@
 import purerpc
-import greeter_pb2
+import generated.greeter_pb2
 
 
 class GreeterServicer(purerpc.Servicer):
@@ -25,8 +25,8 @@ class GreeterServicer(purerpc.Servicer):
             self.SayHello,
             purerpc.RPCSignature(
                 purerpc.Cardinality.UNARY_UNARY,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         service_obj.add_method(
@@ -34,8 +34,8 @@ class GreeterServicer(purerpc.Servicer):
             self.SayHelloGoodbye,
             purerpc.RPCSignature(
                 purerpc.Cardinality.UNARY_STREAM,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         service_obj.add_method(
@@ -43,8 +43,8 @@ class GreeterServicer(purerpc.Servicer):
             self.SayHelloToMany,
             purerpc.RPCSignature(
                 purerpc.Cardinality.STREAM_STREAM,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         service_obj.add_method(
@@ -52,8 +52,8 @@ class GreeterServicer(purerpc.Servicer):
             self.SayHelloToManyAtOnce,
             purerpc.RPCSignature(
                 purerpc.Cardinality.STREAM_UNARY,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         return service_obj
@@ -69,31 +69,31 @@ class GreeterStub:
             "SayHello",
             purerpc.RPCSignature(
                 purerpc.Cardinality.UNARY_UNARY,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         self.SayHelloGoodbye = self._client.get_method_stub(
             "SayHelloGoodbye",
             purerpc.RPCSignature(
                 purerpc.Cardinality.UNARY_STREAM,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         self.SayHelloToMany = self._client.get_method_stub(
             "SayHelloToMany",
             purerpc.RPCSignature(
                 purerpc.Cardinality.STREAM_STREAM,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )
         self.SayHelloToManyAtOnce = self._client.get_method_stub(
             "SayHelloToManyAtOnce",
             purerpc.RPCSignature(
                 purerpc.Cardinality.STREAM_UNARY,
-                greeter_pb2.HelloRequest,
-                greeter_pb2.HelloReply,
+                generated.greeter_pb2.HelloRequest,
+                generated.greeter_pb2.HelloReply,
             )
         )

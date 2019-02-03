@@ -5,8 +5,8 @@ import time
 
 import grpc
 
-from greeter_pb2 import HelloRequest, HelloReply
-from greeter_pb2_grpc import GreeterServicer, add_GreeterServicer_to_server
+from generated.greeter_pb2 import HelloReply
+from generated.greeter_pb2_grpc import GreeterServicer, add_GreeterServicer_to_server
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 

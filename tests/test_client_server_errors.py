@@ -1,11 +1,12 @@
 import unittest
-import curio
+import anyio
 import grpc
 import typing
 import time
 from .greeter_pb2 import HelloReply, HelloRequest
 from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
-from purerpc import Service, Stream, Channel, Client, RpcFailedError
+
+import purerpc
 from purerpc.test_utils import PureRPCTestCase
 
 
@@ -60,20 +61,19 @@ class TestClientServerErrors(PureRPCTestCase):
             GreeterStub = grpc_module.GreeterStub
             async def worker(channel):
                 stub = GreeterStub(channel)
-                with self.assertRaisesRegex(RpcFailedError, r"oops my bad"):
+                with self.assertRaisesRegex(purerpc.RpcFailedError, r"oops my bad"):
                     await stub.SayHello(HelloRequest(name="World"))
 
                 aiter = stub.SayHelloToMany(generator())
                 for _ in range(7):
                     await aiter.__anext__()
-                with self.assertRaisesRegex(RpcFailedError, r"Lucky 7"):
+                with self.assertRaisesRegex(purerpc.RpcFailedError, r"Lucky 7"):
                     await aiter.__anext__()
 
             async def main():
-                channel = Channel("localhost", port)
-                await channel.connect()
-                await worker(channel)
-            curio.run(main)
+                async with purerpc.insecure_channel("localhost", port) as channel:
+                    await worker(channel)
+            anyio.run(main)
 
     def test_errors_purerpc_server_purerpc_client(self):
         with self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
@@ -99,18 +99,17 @@ class TestClientServerErrors(PureRPCTestCase):
 
                 async def worker(channel):
                     stub = GreeterStub(channel)
-                    with self.assertRaisesRegex(RpcFailedError, "oops my bad"):
+                    with self.assertRaisesRegex(purerpc.RpcFailedError, "oops my bad"):
                         await stub.SayHello(HelloRequest(name="World"))
 
                     aiter = stub.SayHelloToMany(generator())
                     for _ in range(7):
                         await aiter.__anext__()
-                    with self.assertRaisesRegex(RpcFailedError, r"Lucky 7"):
+                    with self.assertRaisesRegex(purerpc.RpcFailedError, r"Lucky 7"):
                         await aiter.__anext__()
 
                 async def main():
-                    channel = Channel("localhost", port)
-                    await channel.connect()
-                    await worker(channel)
+                    async with purerpc.insecure_channel("localhost", port) as channel:
+                        await worker(channel)
 
-                curio.run(main)
+                anyio.run(main)

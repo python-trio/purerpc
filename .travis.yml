@@ -9,12 +9,18 @@ stages:
   - name: deploy
     if: tag IS present AND type != pull_request
 env:
-  - PYTHON_IMAGE="python:3.6"
-  - PYTHON_IMAGE="python:3.7"
-  - PYTHON_IMAGE="standy/pypy:3.6-6.1.0"
+  - PYTHON_IMAGE="python:3.6" PURERPC_BACKEND="asyncio"
+  - PYTHON_IMAGE="python:3.6" PURERPC_BACKEND="curio"
+  - PYTHON_IMAGE="python:3.6" PURERPC_BACKEND="trio"
+  - PYTHON_IMAGE="python:3.7" PURERPC_BACKEND="asyncio"
+  - PYTHON_IMAGE="python:3.7" PURERPC_BACKEND="curio"
+  - PYTHON_IMAGE="python:3.7" PURERPC_BACKEND="trio"
+  - PYTHON_IMAGE="standy/pypy:3.6-6.1.0" PURERPC_BACKEND="asyncio"
+  - PYTHON_IMAGE="standy/pypy:3.6-6.1.0" PURERPC_BACKEND="curio"
+  - PYTHON_IMAGE="standy/pypy:3.6-6.1.0" PURERPC_BACKEND="trio"
 
 script:
-  - ./ci/run_tests_in_docker.sh $PYTHON_IMAGE
+  - ./ci/run_tests_in_docker.sh $PYTHON_IMAGE $PURERPC_BACKEND
 
 jobs:
   include:

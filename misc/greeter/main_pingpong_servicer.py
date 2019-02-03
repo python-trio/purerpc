@@ -1,14 +1,9 @@
 import argparse
 import multiprocessing
-import logging
-import logging.config
 
-import curio
-
-from purerpc.server import Service, Server
-from purerpc.rpc import Stream
-from greeter_pb2 import HelloRequest, HelloReply
-from greeter_grpc import GreeterServicer
+from purerpc.server import Server
+from generated.greeter_pb2 import HelloReply
+from generated.greeter_grpc import GreeterServicer
 
 """
 def configure_logs(log_file=None):

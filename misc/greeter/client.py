@@ -1,9 +1,8 @@
 import curio
 import time
-from purerpc.client import Channel, Client
-from greeter_pb2 import HelloRequest, HelloReply
-from greeter_grpc import GreeterStub
-from purerpc.utils import print_memory_growth_statistics
+import purerpc
+from generated.greeter_pb2 import HelloRequest
+from generated.greeter_grpc import GreeterStub
 
 
 async def worker(channel):
@@ -16,14 +15,13 @@ async def worker(channel):
 
 async def main_coro():
     # await curio.spawn(print_memory_growth_statistics(), daemon=True)
-    channel = Channel("localhost", 50055)
-    await channel.connect()
-    for i in range(100):
-        start = time.time()
-        async with curio.TaskGroup() as task_group:
-            for i in range(100):
-                await task_group.spawn(worker(channel))
-        print("RPS: {}".format(10000 / (time.time() - start)))
+    async with purerpc.insecure_channel("localhost", 50055) as channel:
+        for i in range(100):
+            start = time.time()
+            async with curio.TaskGroup() as task_group:
+                for i in range(100):
+                    await task_group.spawn(worker(channel))
+            print("RPS: {}".format(10000 / (time.time() - start)))
 
 
 def main():

@@ -1,9 +1,8 @@
 import unittest
-import threading
-import multiprocessing
-import curio
+import functools
+import collections
 import subprocess
-import purerpc
+import multiprocessing
 import tempfile
 import shutil
 import os
@@ -12,98 +11,121 @@ import inspect
 import importlib
 import concurrent.futures
 import logging
-import logging.config
 import contextlib
 import time
 import random
 import string
+from queue import Empty as QueueEmpty
+
+from tblib import pickling_support
+pickling_support.install()
+
+import anyio
+
+
+WrappedResult = collections.namedtuple("WrappedResult", ("result", "exc_info"))
+
+
+def wrap_gen_in_process(queue):
+    def decorator(gen):
+        @functools.wraps(gen)
+        def new_func(*args, **kwargs):
+            try:
+                for elem in gen(*args, **kwargs):
+                    queue.put(WrappedResult(result=elem, exc_info=None))
+            except:
+                queue.put(WrappedResult(result=None, exc_info=sys.exc_info()))
+            finally:
+                queue.close()
+                queue.join_thread()
+        return new_func
+    return decorator
 
 
 class PureRPCTestCase(unittest.TestCase):
-    def random_payload(self, min_size=1000, max_size=100000):
+    @staticmethod
+    def random_payload(min_size=1000, max_size=100000):
         return "".join(random.choice(string.ascii_letters)
                        for _ in range(random.randint(min_size, max_size)))
 
+    @staticmethod
     @contextlib.contextmanager
-    def run_purerpc_service_in_process(self, service):
+    def run_context_manager_generator_in_process(cm_gen):
         queue = multiprocessing.Queue()
-        def target_fn():
-            server = purerpc.Server(port=0)
-            server.add_service(service)
-            socket = server._create_socket_and_listen()
-            queue.put(socket.getsockname()[1])
-            queue.close()
-            queue.join_thread()
-            curio.run(server._run_async_server, socket)
+        target_fn = wrap_gen_in_process(queue)(cm_gen)
 
         process = multiprocessing.Process(target=target_fn)
         process.start()
-        port = queue.get()
-        queue.close()
-        queue.join_thread()
         try:
-            yield port
+            wrapped_result = queue.get()
+            if wrapped_result.exc_info is not None:
+                raise wrapped_result.exc_info[0].with_traceback(*wrapped_result.exc_info[1:])
+            else:
+                yield wrapped_result.result
         finally:
-            process.terminate()
-            process.join()
+            try:
+                exc_info = queue.get_nowait().exc_info
+                if exc_info is not None:
+                    raise exc_info[0].with_traceback(*exc_info[1:])
+            except QueueEmpty:
+                pass
+            finally:
+                process.terminate()
+                process.join()
+                queue.close()
+                queue.join_thread()
 
-    @contextlib.contextmanager
+    @classmethod
+    def run_purerpc_service_in_process(self, service):
+        def target_fn():
+            import purerpc
+            server = purerpc.Server(port=0)
+            server.add_service(service)
+            socket = server._create_socket_and_listen()
+            yield socket.getsockname()[1]
+            anyio.run(server._run_async_server, socket)
+        return self.run_context_manager_generator_in_process(target_fn)
+
+    @classmethod
     def run_grpc_service_in_process(self, add_handler_fn):
-        queue = multiprocessing.Queue()
         def target_fn():
             import grpc
             server = grpc.server(concurrent.futures.ThreadPoolExecutor(max_workers=8))
             port = server.add_insecure_port('[::]:0')
             add_handler_fn(server)
             server.start()
-
-            queue.put(port)
-            queue.close()
-            queue.join_thread()
+            yield port
             while True:
                 time.sleep(60)
+        return self.run_context_manager_generator_in_process(target_fn)
 
-        process = multiprocessing.Process(target=target_fn)
-        process.start()
-        port = queue.get()
-        queue.close()
-        queue.join_thread()
-        try:
-            yield port
-        finally:
-            process.terminate()
-            process.join()
-
-    def run_tests_in_workers(self, *, target, num_workers):
+    @staticmethod
+    def run_tests_in_workers(*, target, num_workers):
         queue = multiprocessing.Queue()
 
+        @wrap_gen_in_process(queue)
         def target_fn():
-            try:
-                target()
-            except:
-                queue.put(False)
-                raise
-            else:
-                queue.put(True)
+            target()
+            yield
+
+        processes = [multiprocessing.Process(target=target_fn) for _ in range(num_workers)]
+        for process in processes:
+            process.start()
+
+        try:
+            for _ in range(num_workers):
+                wrapped_result = queue.get()
+                if wrapped_result.exc_info is not None:
+                    raise wrapped_result.exc_info[0].with_traceback(*wrapped_result.exc_info[1:])
+        finally:
             queue.close()
             queue.join_thread()
+            for process in processes:
+                process.join()
 
-        processes = []
-        for _ in range(num_workers):
-            process = multiprocessing.Process(target=target_fn)
-            process.start()
-            processes.append(process)
-
-        for _ in range(num_workers):
-            self.assertTrue(queue.get())
-        queue.close()
-        queue.join_thread()
-
-        for process in processes:
-            process.join()
-
+    @staticmethod
     @contextlib.contextmanager
-    def compile_temp_proto(self, *relative_proto_paths):
+    def compile_temp_proto(*relative_proto_paths):
         modules = []
         with tempfile.TemporaryDirectory() as temp_dir:
             sys.path.insert(0, temp_dir)
@@ -133,26 +155,6 @@ class PureRPCTestCase(unittest.TestCase):
     def setUp(self):
         self.configure_logs()
 
-    def configure_logs(self):
-        conf = {
-            "version": 1,
-            "formatters": {
-                "simple": {
-                    "format": "[%(asctime)s - %(name)s - %(levelname)s]:  %(message)s"
-                },
-            },
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "level": "INFO",
-                    "formatter": "simple",
-                    "stream": "ext://sys.stdout",
-                }
-            },
-            "root": {
-                "level": "DEBUG",
-                "handlers": ["console"],
-            },
-            "disable_existing_loggers": False
-        }
-        logging.config.dictConfig(conf)
+    @staticmethod
+    def configure_logs():
+        logging.basicConfig(format="[%(asctime)s - %(name)s - %(levelname)s]:  %(message)s", level=logging.WARNING)
