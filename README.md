@@ -2,10 +2,10 @@
 
 [![Build Status](https://travis-ci.org/standy66/purerpc.png?branch=master)](https://travis-ci.org/standy66/purerpc)
 
-Asynchronous pure Python gRPC server and client implementation supporting
+Asynchronous pure Python gRPC client and server implementation supporting
 [asyncio](https://docs.python.org/3/library/asyncio.html),
 [curio](https://github.com/dabeaz/curio) and
-[trio](https://github.com/python-trio/trio).
+[trio](https://github.com/python-trio/trio) (achieved with [anyio](https://github.com/agronholm/anyio) compatibility layer).
 
 ## Requirements
 
