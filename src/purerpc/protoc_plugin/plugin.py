@@ -28,60 +28,81 @@ def get_python_type(proto_name, proto_type):
 def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                           proto_for_entity):
     lines = ["import purerpc"]
-    lines.append(f"import {get_python_package(proto_file.name)}")
+    lines.append("import " + get_python_package(proto_file.name))
     for dep_module in proto_file.dependency:
-        lines.append(f"import {get_python_package(dep_module)}")
+        lines.append("import " + get_python_package(dep_module))
     for service in proto_file.service:
         if proto_file.package:
             fully_qualified_service_name = proto_file.package + "." + service.name
         else:
             fully_qualified_service_name = service.name
 
-        lines.append(f"\n\nclass {service.name}Servicer(purerpc.Servicer):")
+        lines.append("\n\nclass {service_name}Servicer(purerpc.Servicer):".format(service_name=service.name))
         for method in service.method:
             plural_suffix = "s" if method.client_streaming else ""
-            lines.append(f"    async def {method.name}(self, input_message{plural_suffix}):")
-            lines.append("        raise NotImplementedError()\n")
-        lines.append("    @property")
-        lines.append("    def service(self) -> purerpc.Service:")
-        lines.append("        service_obj = purerpc.Service(")
-        lines.append(f"            \"{fully_qualified_service_name}\"")
-        lines.append("        )")
+            fmt_string = ("    async def {method_name}(self, input_message{plural_suffix}):\n"
+                          "        raise NotImplementedError()\n")
+            lines.append(fmt_string.format(
+                method_name=method.name,
+                plural_suffix=plural_suffix,
+            ))
+        fmt_string = ("    @property\n"
+                      "    def service(self) -> purerpc.Service:\n"
+                      "        service_obj = purerpc.Service(\n"
+                      "            \"{fully_qualified_service_name}\"\n"
+                      "        )")
+        lines.append(fmt_string.format(fully_qualified_service_name=fully_qualified_service_name))
         for method in service.method:
             input_proto = proto_for_entity[method.input_type]
             output_proto = proto_for_entity[method.output_type]
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
-            lines.append("        service_obj.add_method(")
-            lines.append(f"            \"{method.name}\",")
-            lines.append(f"            self.{method.name},")
-            lines.append("            purerpc.RPCSignature(")
-            lines.append(f"                purerpc.{cardinality},")
-            lines.append(f"                {get_python_type(input_proto, method.input_type)},")
-            lines.append(f"                {get_python_type(output_proto, method.output_type)},")
-            lines.append("            )")
-            lines.append("        )")
+            fmt_string = ("        service_obj.add_method(\n"
+                          "            \"{method_name}\",\n"
+                          "            self.{method_name},\n"
+                          "            purerpc.RPCSignature(\n"
+                          "                purerpc.{cardinality},\n"
+                          "                {input_type},\n"
+                          "                {output_type},\n"
+                          "            )\n"
+                          "        )")
+            lines.append(fmt_string.format(
+                method_name=method.name,
+                cardinality=cardinality,
+                input_type=get_python_type(input_proto, method.input_type),
+                output_type=get_python_type(output_proto, method.output_type),
+            ))
         lines.append("        return service_obj\n\n")
 
-        lines.append(f"class {service.name}Stub:")
-        lines.append("    def __init__(self, channel):")
-        lines.append("        self._client = purerpc.Client(")
-        lines.append(f"            \"{fully_qualified_service_name}\",")
-        lines.append("            channel")
-        lines.append("        )")
+        fmt_string = ("class {service_name}Stub:\n"
+                      "    def __init__(self, channel):\n"
+                      "        self._client = purerpc.Client(\n"
+                      "            \"{fully_qualified_service_name}\",\n"
+                      "            channel\n"
+                      "        )")
+        lines.append(fmt_string.format(
+            service_name = service.name,
+            fully_qualified_service_name=fully_qualified_service_name
+        ))
         for method in service.method:
             input_proto = proto_for_entity[method.input_type]
             output_proto = proto_for_entity[method.output_type]
             cardinality = Cardinality.get_cardinality_for(request_stream=method.client_streaming,
                                                           response_stream=method.server_streaming)
-            lines.append(f"        self.{method.name} = self._client.get_method_stub(")
-            lines.append(f"            \"{method.name}\",")
-            lines.append("            purerpc.RPCSignature(")
-            lines.append(f"                purerpc.{cardinality},")
-            lines.append(f"                {get_python_type(input_proto, method.input_type)},")
-            lines.append(f"                {get_python_type(output_proto, method.output_type)},")
-            lines.append("            )")
-            lines.append("        )")
+            fmt_string = ("        self.{method_name} = self._client.get_method_stub(\n"
+                          "            \"{method_name}\",\n"
+                          "            purerpc.RPCSignature(\n"
+                          "                purerpc.{cardinality},\n"
+                          "                {input_type},\n"
+                          "                {output_type},\n"
+                          "            )\n"
+                          "        )")
+            lines.append(fmt_string.format(
+                method_name=method.name,
+                cardinality=cardinality,
+                input_type=get_python_type(input_proto, method.input_type),
+                output_type=get_python_type(output_proto, method.output_type),
+            ))
 
     return "\n".join(lines)
 

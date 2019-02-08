@@ -158,7 +158,7 @@ class ConnectionHandler:
         except KeyError:
             await stream.close(Status(
                 StatusCode.UNIMPLEMENTED,
-                status_message=f"Service {event.service_name} is not implemented"
+                status_message="Service {service_name} is not implemented".format(service_name=event.service_name)
             ))
             return
 
@@ -167,8 +167,10 @@ class ConnectionHandler:
         except KeyError:
             await stream.close(Status(
                 StatusCode.UNIMPLEMENTED,
-                status_message=f"Method {event.method_name} is not implemented in "
-                               f"service {event.service_name}"
+                status_message="Method {method_name} is not implemented in service {service_name}".format(
+                    method_name=event.method_name,
+                    service_name=event.service_name
+                )
             ))
             return
 

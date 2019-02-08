@@ -14,7 +14,7 @@ WantWrite = (BlockingIOError, InterruptedError, ssl.SSLWantWriteError)
 def _new_run(func, *args, backend=None, backend_options=None):
     if backend is None:
         backend = os.getenv("PURERPC_BACKEND", "asyncio")
-    log.info(f"Selected {backend} backend")
+    log.info("Selected {} backend".format(backend))
     _anyio_run(func, *args, backend=backend, backend_options=backend_options)
 
 

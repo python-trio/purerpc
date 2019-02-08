@@ -1,6 +1,7 @@
 import unittest
 import anyio
 import grpc
+from async_generator import async_generator, yield_
 import typing
 import time
 from .greeter_pb2 import HelloReply, HelloRequest
@@ -15,26 +16,28 @@ class TestClientServerSimple(PureRPCTestCase):
 
         @service.rpc("SayHello")
         async def say_hello(message: HelloRequest) -> HelloReply:
-            return HelloReply(message=f"Hello, {message.name}")
+            return HelloReply(message="Hello, " + message.name)
 
         @service.rpc("SayHelloGoodbye")
+        @async_generator
         async def say_hello_goodbye(message: HelloRequest) -> Stream[HelloReply]:
-            yield HelloReply(message=f"Hello, {message.name}")
+            await yield_(HelloReply(message="Hello, " + message.name))
             await anyio.sleep(0.05)
-            yield HelloReply(message=f"Goodbye, {message.name}")
+            await yield_(HelloReply(message="Goodbye, " + message.name))
 
         @service.rpc("SayHelloToManyAtOnce")
         async def say_hello_to_many_at_once(messages: Stream[HelloRequest]) -> HelloReply:
             names = []
             async for message in messages:
                 names.append(message.name)
-            return HelloReply(message=f"Hello, {', '.join(names)}")
+            return HelloReply(message="Hello, " + ', '.join(names))
 
         @service.rpc("SayHelloToMany")
+        @async_generator
         async def say_hello_to_many(messages: Stream[HelloRequest]) -> Stream[HelloReply]:
             async for message in messages:
                 await anyio.sleep(0.05)
-                yield HelloReply(message="Hello, " + message.name)
+                await yield_(HelloReply(message="Hello, " + message.name))
 
         with self.run_purerpc_service_in_process(service) as port:
             def name_generator():
@@ -67,12 +70,12 @@ class TestClientServerSimple(PureRPCTestCase):
     def test_grpc_server_purerpc_client(self):
         class Servicer(GreeterServicer):
             def SayHello(self, message, context):
-                return HelloReply(message=f"Hello, {message.name}")
+                return HelloReply(message="Hello, " + message.name)
 
             def SayHelloGoodbye(self, message, context):
-                yield HelloReply(message=f"Hello, {message.name}")
+                yield HelloReply(message="Hello, " + message.name)
                 time.sleep(0.05)
-                yield HelloReply(message=f"Goodbye, {message.name}")
+                yield HelloReply(message="Goodbye, " + message.name)
 
             def SayHelloToMany(self, messages, context):
                 for message in messages:
@@ -83,7 +86,7 @@ class TestClientServerSimple(PureRPCTestCase):
                 names = []
                 for message in messages:
                     names.append(message.name)
-                return HelloReply(message=f"Hello, {', '.join(names)}")
+                return HelloReply(message="Hello, " + ', '.join(names))
 
         with self.run_grpc_service_in_process(
                         lambda server: add_GreeterServicer_to_server(Servicer(), server)) as port:
@@ -145,26 +148,28 @@ class TestClientServerSimple(PureRPCTestCase):
 
         @service.rpc("SayHello")
         async def say_hello(message: HelloRequest) -> HelloReply:
-            return HelloReply(message=f"Hello, {message.name}")
+            return HelloReply(message="Hello, " + message.name)
 
         @service.rpc("SayHelloGoodbye")
+        @async_generator
         async def say_hello_goodbye(message: HelloRequest) -> Stream[HelloReply]:
-            yield HelloReply(message=f"Hello, {message.name}")
+            await yield_(HelloReply(message="Hello, " + message.name))
             await anyio.sleep(0.05)
-            yield HelloReply(message=f"Goodbye, {message.name}")
+            await yield_(HelloReply(message="Goodbye, " + message.name))
 
         @service.rpc("SayHelloToManyAtOnce")
         async def say_hello_to_many_at_once(messages: Stream[HelloRequest]) -> HelloReply:
             names = []
             async for message in messages:
                 names.append(message.name)
-            return HelloReply(message=f"Hello, {', '.join(names)}")
+            return HelloReply(message="Hello, " + ', '.join(names))
 
         @service.rpc("SayHelloToMany")
+        @async_generator
         async def say_hello_to_many(messages: Stream[HelloRequest]) -> Stream[HelloReply]:
             async for message in messages:
                 await anyio.sleep(0.05)
-                yield HelloReply(message="Hello, " + message.name)
+                await yield_(HelloReply(message="Hello, " + message.name))
 
         with self.run_purerpc_service_in_process(service) as port:
             async def test_say_hello(client):

@@ -1,7 +1,8 @@
 import base64
+import collections
 
 
-class HeaderDict(dict):
+class HeaderDict(collections.OrderedDict):
     def __init__(self, values):
         super().__init__()
         for key, value in values:
@@ -36,11 +37,11 @@ class HeaderDict(dict):
 def sanitize_headers(headers):
     for name, value in headers:
         if isinstance(value, bytes) and not name.endswith("-bin"):
-            raise ValueError(f"Got binary value for header name '{name}', but name does not end "
-                             f"with '-bin' suffix")
+            raise ValueError("Got binary value for header name '{}', but name does not end "
+                             "with '-bin' suffix".format(name))
         if name.startswith("grpc-"):
-            raise ValueError(f"Got header with name '{name}', but custom metadata headers should "
-                             f"not start with 'grpc-' prefix")
+            raise ValueError("Got header with name '{}', but custom metadata headers should "
+                             "not start with 'grpc-' prefix".format(name))
         if name.endswith("-bin"):
             yield name, b64encode(value)
         else:

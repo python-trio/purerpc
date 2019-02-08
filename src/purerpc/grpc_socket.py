@@ -3,6 +3,7 @@ import socket
 import datetime
 
 import anyio
+from async_generator import async_generator, yield_, yield_from_
 import h2
 import h2.events
 import h2.exceptions
@@ -193,6 +194,7 @@ class GRPCSocket:
             del self._streams[stream_id]
             del self._streams_count[stream_id]
 
+    @async_generator
     async def _listen(self):
         while True:
             data = await self._socket.recv(self._receive_buffer_size)
@@ -214,7 +216,7 @@ class GRPCSocket:
                 await self._streams[event.stream_id]._incoming_events.put(event)
 
                 if isinstance(event, RequestReceived):
-                    yield self._streams[event.stream_id]
+                    await yield_(self._streams[event.stream_id])
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._decref_stream(event.stream_id)
             await self._socket.try_flush()
@@ -229,11 +231,11 @@ class GRPCSocket:
         if self.client_side:
             await parent_task_group.spawn(self._listener_thread)
 
+    @async_generator
     async def listen(self):
         if self.client_side:
             raise ValueError("Cannot listen client-side socket")
-        async for stream in self._listen():
-            yield stream
+        await yield_from_(self._listen())
 
     async def start_request(self, scheme: str, service_name: str, method_name: str,
                             message_type=None, authority=None, timeout: datetime.timedelta=None,

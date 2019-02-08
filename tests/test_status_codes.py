@@ -15,7 +15,7 @@ class TestStatusCodes(PureRPCTestCase):
 
         @service.rpc("SayHello")
         async def say_hello(message: HelloRequest) -> HelloReply:
-            return HelloReply(message=f"Hello, {message.name}")
+            return HelloReply(message="Hello, " + message.name)
 
         with self.run_purerpc_service_in_process(service) as port:
             with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
@@ -28,7 +28,7 @@ class TestStatusCodes(PureRPCTestCase):
 
         @service.rpc("SomeOtherMethod")
         async def say_hello(message: HelloRequest) -> HelloReply:
-            return HelloReply(message=f"Hello, {message.name}")
+            return HelloReply(message="Hello, " + message.name)
 
         with self.run_purerpc_service_in_process(service) as port:
             with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
@@ -39,9 +39,9 @@ class TestStatusCodes(PureRPCTestCase):
     def test_grpc_server_purerpc_client_wrong_method_name(self):
         class Servicer(GreeterServicer):
             def SayHelloGoodbye(self, message, context):
-                yield HelloReply(message=f"Hello, {message.name}")
+                yield HelloReply(message="Hello, " + message.name)
                 time.sleep(0.05)
-                yield HelloReply(message=f"Goodbye, {message.name}")
+                yield HelloReply(message="Goodbye, " + message.name)
 
         with self.run_grpc_service_in_process(
                         lambda server: add_GreeterServicer_to_server(Servicer(), server)) as port, \
