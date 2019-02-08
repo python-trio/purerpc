@@ -81,7 +81,7 @@ def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                       "            channel\n"
                       "        )")
         lines.append(fmt_string.format(
-            service_name = service.name,
+            service_name=service.name,
             fully_qualified_service_name=fully_qualified_service_name
         ))
         for method in service.method:
