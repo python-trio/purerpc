@@ -3,4 +3,4 @@ FROM ${BASE_IMAGE}
 COPY . /purerpc
 WORKDIR /purerpc
 RUN pip install .
-RUN pip install curio trio  # Optional, for tests
+RUN pip install curio trio==0.10  # Optional, for tests
