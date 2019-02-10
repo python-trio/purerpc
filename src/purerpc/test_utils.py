@@ -21,6 +21,7 @@ from tblib import pickling_support
 pickling_support.install()
 
 import anyio
+from async_generator import aclosing
 
 
 WrappedResult = collections.namedtuple("WrappedResult", ("result", "exc_info"))
@@ -43,6 +44,14 @@ def wrap_gen_in_process(queue):
 
 
 class PureRPCTestCase(unittest.TestCase):
+    @staticmethod
+    async def async_iterable_to_list(async_iterable):
+        result = []
+        async with aclosing(async_iterable) as async_iterable:
+            async for value in async_iterable:
+                result.append(value)
+        return result
+
     @staticmethod
     def random_payload(min_size=1000, max_size=100000):
         return "".join(random.choice(string.ascii_letters)
@@ -141,7 +150,7 @@ class PureRPCTestCase(unittest.TestCase):
                     proto_filename = os.path.basename(relative_proto_path)
                     proto_temp_path = os.path.join(temp_dir, proto_filename)
                     cmdline = [sys.executable, '-m', 'grpc_tools.protoc', '--python_out=.',
-                               '--purerpc_out=.', f'-I{temp_dir}', proto_temp_path]
+                               '--purerpc_out=.', '-I' + temp_dir, proto_temp_path]
                     subprocess.check_call(cmdline, cwd=temp_dir)
                     pb2_module_name = proto_filename.replace(".proto", "_pb2")
                     grpc_module_name = proto_filename.replace(".proto", "_grpc")

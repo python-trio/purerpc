@@ -1,4 +1,8 @@
+import functools
+
 import anyio
+from async_generator import aclosing, async_generator, asynccontextmanager, yield_, yield_from_
+
 from .grpclib.exceptions import ProtocolError, raise_status
 from .grpclib.status import Status, StatusCode
 from purerpc.grpc_proto import GRPCProtoStream
@@ -17,6 +21,7 @@ async def extract_message_from_singleton_stream(stream):
     return msg
 
 
+@async_generator
 async def stream_to_async_iterator(stream: GRPCProtoStream):
     while True:
         msg = await stream.receive_message()
@@ -25,12 +30,12 @@ async def stream_to_async_iterator(stream: GRPCProtoStream):
             if isinstance(event, ResponseEnded):
                 raise_status(event.status)
             return
-        yield msg
+        await yield_(msg)
 
 
-async def send_multiple_messages_server(stream, agen):
-    async with anyio.finalize(agen) as tmp:
-        async for message in tmp:
+async def send_multiple_messages_server(stream, aiter):
+    async with aclosing(aiter) as aiter:
+        async for message in aiter:
             await stream.send_message(message)
     await stream.close(Status(StatusCode.OK))
 
@@ -40,18 +45,20 @@ async def send_single_message_server(stream, message):
     await stream.close(Status(StatusCode.OK))
 
 
-async def send_multiple_messages_client(stream, agen):
+async def send_multiple_messages_client(stream, aiter):
     try:
-        async with anyio.finalize(agen) as tmp:
-            async for message in tmp:
+        async with aclosing(aiter) as aiter:
+            async for message in aiter:
                 await stream.send_message(message)
     finally:
         await stream.close()
 
 
 async def send_single_message_client(stream, message):
-    await stream.send_message(message)
-    await stream.close()
+    try:
+        await stream.send_message(message)
+    finally:
+        await stream.close()
 
 
 async def call_server_unary_unary(func, stream):
@@ -75,9 +82,8 @@ async def call_server_stream_stream(func, stream):
 
 
 class ClientStub:
-    def __init__(self, stream_fn, parent_task_group):
+    def __init__(self, stream_fn):
         self._stream_fn = stream_fn
-        self._parent_task_group = parent_task_group
 
 
 class ClientStubUnaryUnary(ClientStub):
@@ -88,27 +94,28 @@ class ClientStubUnaryUnary(ClientStub):
 
 
 class ClientStubUnaryStream(ClientStub):
+    @async_generator
     async def __call__(self, message, *, metadata=None):
         stream = await self._stream_fn(metadata=metadata)
         await send_single_message_client(stream, message)
-        async for message in stream_to_async_iterator(stream):
-            yield message
+        await yield_from_(stream_to_async_iterator(stream))
 
 
 class ClientStubStreamUnary(ClientStub):
     async def __call__(self, message_aiter, *, metadata=None):
         stream = await self._stream_fn(metadata=metadata)
-        await self._parent_task_group.spawn(send_multiple_messages_client, stream, message_aiter)
-        return await extract_message_from_singleton_stream(stream)
+        async with anyio.create_task_group() as task_group:
+            await task_group.spawn(send_multiple_messages_client, stream, message_aiter)
+            return await extract_message_from_singleton_stream(stream)
 
 
 class ClientStubStreamStream(ClientStub):
+    @async_generator
     async def call_aiter(self, message_aiter, metadata):
         stream = await self._stream_fn(metadata=metadata)
-        if message_aiter is not None:
-            await self._parent_task_group.spawn(send_multiple_messages_client, stream, message_aiter)
-            async for message in stream_to_async_iterator(stream):
-                yield message
+        async with anyio.create_task_group() as task_group:
+            await task_group.spawn(send_multiple_messages_client, stream, message_aiter)
+            await yield_from_(stream_to_async_iterator(stream))
 
     async def call_stream(self, metadata):
         return await self._stream_fn(metadata=metadata)

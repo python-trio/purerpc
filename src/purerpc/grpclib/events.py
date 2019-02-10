@@ -89,8 +89,13 @@ class RequestReceived(Event):
         return event
 
     def __repr__(self):
-        return (f"<purerpc.grpclib.events.RequestReceived stream_id: {self.stream_id}, "\
-                f"service_name: {self.service_name}, method_name: {self.method_name}>")
+        fmt_string = ("<purerpc.grpclib.events.RequestReceived stream_id: {stream_id}, "
+                      "service_name: {service_name}, method_name: {method_name}>")
+        return fmt_string.format(
+            stream_id=self.stream_id,
+            service_name=self.service_name,
+            method_name=self.method_name,
+        )
 
 
 class MessageReceived(Event):
@@ -100,8 +105,12 @@ class MessageReceived(Event):
         self.flow_controlled_length = flow_controlled_length
 
     def __repr__(self):
-        return (f"<purerpc.grpclib.events.MessageReceived stream_id: {self.stream_id}, "
-                f"flow_controlled_length: {self.flow_controlled_length}>")
+        fmt_string= ("<purerpc.grpclib.events.MessageReceived stream_id: {stream_id}, "
+                     "flow_controlled_length: {flow_controlled_length}>")
+        return fmt_string.format(
+            stream_id=self.stream_id,
+            flow_controlled_length=self.flow_controlled_length,
+        )
 
 
 class RequestEnded(Event):
@@ -109,7 +118,10 @@ class RequestEnded(Event):
         self.stream_id = stream_id
 
     def __repr__(self):
-        return f"<purerpc.grpclib.events.RequestEnded stream_id: {self.stream_id}>"
+        fmt_string = "<purerpc.grpclib.events.RequestEnded stream_id: {stream_id}>"
+        return fmt_string.format(
+            stream_id=self.stream_id,
+        )
 
 
 class ResponseReceived(Event):
@@ -142,7 +154,11 @@ class ResponseReceived(Event):
         return event
 
     def __repr__(self):
-        return f"<purerpc.grpclib.events.ResponseReceived stream_id: {self.stream_id} content_type: {self.content_type}>"
+        fmt_string = "<purerpc.grpclib.events.ResponseReceived stream_id: {stream_id} content_type: {content_type}>"
+        return fmt_string.format(
+            stream_id=self.stream_id,
+            content_type=self.content_type,
+        )
 
 
 class ResponseEnded(Event):
@@ -170,4 +186,8 @@ class ResponseEnded(Event):
         return event
 
     def __repr__(self):
-        return f"<purerpc.grpclib.events.ResponseEnded stream_id: {self.stream_id}, status: {self.status}>"
+        fmt_string = "<purerpc.grpclib.events.ResponseEnded stream_id: {stream_id}, status: {status}>"
+        return fmt_string.format(
+            stream_id=self.stream_id,
+            status=self.status,
+        )

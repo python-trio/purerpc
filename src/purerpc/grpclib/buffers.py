@@ -100,8 +100,12 @@ class MessageReadBuffer:
             if self._message_length > self._max_message_length:
                 # Even after the error is raised, the state is not corrupted, and parsing
                 # can be safely resumed
-                raise MessageTooLargeError("Received message larger than max: "
-                                           f"{self._message_length} > {self._max_message_length}")
+                raise MessageTooLargeError(
+                    "Received message larger than max: {message_length} > {max_message_length}".format(
+                        message_length=self._message_length,
+                        max_message_length=self._max_message_length,
+                    )
+                )
         if len(self._buffer) < self._message_length:
             return None, 0
         data, flow_controlled_length = self._buffer.popleft_flowcontrol(self._message_length)
@@ -160,8 +164,12 @@ class MessageWriteBuffer:
         if compress:
             data = self.compress(data)
         if len(data) > self._max_message_length:
-            raise MessageTooLargeError("Trying to send message larger than max: "
-                                       f"{len(data)} > {self._max_message_length}")
+            raise MessageTooLargeError(
+                "Trying to send message larger than max: {message_length} > {max_message_length}".format(
+                    message_length=len(data),
+                    max_message_length=self._max_message_length,
+                )
+            )
         self._buffer.append(struct.pack('>?I', compress, len(data)))
         self._buffer.append(data)
 

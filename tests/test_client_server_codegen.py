@@ -1,6 +1,9 @@
 import unittest
 import anyio
 import grpc
+
+from async_generator import async_generator, yield_
+
 import typing
 import time
 from .greeter_pb2 import HelloReply, HelloRequest
@@ -16,23 +19,25 @@ class TestClientServerCodegen(PureRPCTestCase):
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
-                    return HelloReply(message=f"Hello, {message.name}")
+                    return HelloReply(message="Hello, " + message.name)
 
+                @async_generator
                 async def SayHelloGoodbye(self, message):
-                    yield HelloReply(message=f"Hello, {message.name}")
+                    await yield_(HelloReply(message="Hello, " + message.name))
                     await anyio.sleep(0.05)
-                    yield HelloReply(message=f"Goodbye, {message.name}")
+                    await yield_(HelloReply(message="Goodbye, " + message.name))
 
                 async def SayHelloToManyAtOnce(self, messages):
                     names = []
                     async for message in messages:
                         names.append(message.name)
-                    return HelloReply(message=f"Hello, {', '.join(names)}")
+                    return HelloReply(message="Hello, " + ', '.join(names))
 
+                @async_generator
                 async def SayHelloToMany(self, messages):
                     async for message in messages:
                         await anyio.sleep(0.05)
-                        yield HelloReply(message="Hello, " + message.name)
+                        await yield_(HelloReply(message="Hello, " + message.name))
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
                 def name_generator():
@@ -67,12 +72,12 @@ class TestClientServerCodegen(PureRPCTestCase):
     def test_grpc_server_purerpc_client(self):
         class Servicer(GreeterServicer):
             def SayHello(self, message, context):
-                return HelloReply(message=f"Hello, {message.name}")
+                return HelloReply(message="Hello, " + message.name)
 
             def SayHelloGoodbye(self, message, context):
-                yield HelloReply(message=f"Hello, {message.name}")
+                yield HelloReply(message="Hello, " + message.name)
                 time.sleep(0.05)
-                yield HelloReply(message=f"Goodbye, {message.name}")
+                yield HelloReply(message="Goodbye, " + message.name)
 
             def SayHelloToMany(self, messages, context):
                 for message in messages:
@@ -83,16 +88,17 @@ class TestClientServerCodegen(PureRPCTestCase):
                 names = []
                 for message in messages:
                     names.append(message.name)
-                return HelloReply(message=f"Hello, {', '.join(names)}")
+                return HelloReply(message="Hello, " + ', '.join(names))
 
         with self.run_grpc_service_in_process(
                         lambda server: add_GreeterServicer_to_server(Servicer(), server)) as port, \
              self.compile_temp_proto("data/greeter.proto") as (_, grpc_module):
 
+            @async_generator
             async def name_generator():
                 names = ('Foo', 'Bar', 'Bat', 'Baz')
                 for name in names:
-                    yield HelloRequest(name=name)
+                    await yield_(HelloRequest(name=name))
             
             GreeterStub = grpc_module.GreeterStub
             async def worker(channel):
@@ -102,8 +108,8 @@ class TestClientServerCodegen(PureRPCTestCase):
                     "Hello, World"
                 )
                 self.assertEqual(
-                    [response.message async for response in
-                        stub.SayHelloGoodbye(HelloRequest(name="World"))],
+                    [response.message for response in await self.async_iterable_to_list(
+                        stub.SayHelloGoodbye(HelloRequest(name="World")))],
                     ["Hello, World", "Goodbye, World"]
                 )
                 self.assertEqual(
@@ -111,7 +117,8 @@ class TestClientServerCodegen(PureRPCTestCase):
                     "Hello, Foo, Bar, Bat, Baz"
                 )
                 self.assertEqual(
-                    [response.message async for response in stub.SayHelloToMany(name_generator())],
+                    [response.message for response in await self.async_iterable_to_list(
+                        stub.SayHelloToMany(name_generator()))],
                     ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
                 )
 
@@ -129,29 +136,32 @@ class TestClientServerCodegen(PureRPCTestCase):
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
-                    return HelloReply(message=f"Hello, {message.name}")
+                    return HelloReply(message="Hello, " + message.name)
 
+                @async_generator
                 async def SayHelloGoodbye(self, message):
-                    yield HelloReply(message=f"Hello, {message.name}")
+                    await yield_(HelloReply(message="Hello, " + message.name))
                     await anyio.sleep(0.05)
-                    yield HelloReply(message=f"Goodbye, {message.name}")
+                    await yield_(HelloReply(message="Goodbye, " + message.name))
 
                 async def SayHelloToManyAtOnce(self, messages):
                     names = []
                     async for message in messages:
                         names.append(message.name)
-                    return HelloReply(message=f"Hello, {', '.join(names)}")
+                    return HelloReply(message="Hello, " + ', '.join(names))
 
+                @async_generator
                 async def SayHelloToMany(self, messages):
                     async for message in messages:
                         await anyio.sleep(0.05)
-                        yield HelloReply(message="Hello, " + message.name)
+                        await yield_(HelloReply(message="Hello, " + message.name))
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
+                @async_generator
                 async def name_generator():
                     names = ('Foo', 'Bar', 'Bat', 'Baz')
                     for name in names:
-                        yield HelloRequest(name=name)
+                        await yield_(HelloRequest(name=name))
 
                 async def worker(channel):
                     stub = GreeterStub(channel)
@@ -160,8 +170,8 @@ class TestClientServerCodegen(PureRPCTestCase):
                         "Hello, World"
                     )
                     self.assertEqual(
-                        [response.message async for response in
-                            stub.SayHelloGoodbye(HelloRequest(name="World"))],
+                        [response.message for response in await self.async_iterable_to_list(
+                            stub.SayHelloGoodbye(HelloRequest(name="World")))],
                         ["Hello, World", "Goodbye, World"]
                     )
                     self.assertEqual(
@@ -169,7 +179,8 @@ class TestClientServerCodegen(PureRPCTestCase):
                         "Hello, Foo, Bar, Bat, Baz"
                     )
                     self.assertEqual(
-                        [response.message async for response in stub.SayHelloToMany(name_generator())],
+                        [response.message for response in await self.async_iterable_to_list(
+                            stub.SayHelloToMany(name_generator()))],
                         ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
                     )
 
@@ -188,7 +199,7 @@ class TestClientServerCodegen(PureRPCTestCase):
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
-                    return HelloReply(message=f"Hello, {message.name}")
+                    return HelloReply(message="Hello, " + message.name)
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
                 async def worker(channel):
@@ -214,7 +225,7 @@ class TestClientServerCodegen(PureRPCTestCase):
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
-                    return HelloReply(message=f"Hello, {message.name}")
+                    return HelloReply(message="Hello, " + message.name)
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
                 async def worker(channel):
@@ -239,7 +250,7 @@ class TestClientServerCodegen(PureRPCTestCase):
 
             class Servicer(GreeterServicer):
                 async def SayHello(self, message):
-                    return HelloReply(message=f"Hello, {message.name}")
+                    return HelloReply(message="Hello, " + message.name)
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
                 def target_fn():
@@ -261,9 +272,10 @@ class TestClientServerCodegen(PureRPCTestCase):
                 async def SayHello(self, message):
                     return HelloReply(message=message.name)
 
+                @async_generator
                 async def SayHelloGoodbye(self, message):
-                    yield HelloReply(message=message.name)
-                    yield HelloReply(message=message.name)
+                    await yield_(HelloReply(message=message.name))
+                    await yield_(HelloReply(message=message.name))
 
                 async def SayHelloToManyAtOnce(self, messages):
                     names = []
@@ -271,24 +283,27 @@ class TestClientServerCodegen(PureRPCTestCase):
                         names.append(message.name)
                     return HelloReply(message="".join(names))
 
+                @async_generator
                 async def SayHelloToMany(self, messages):
                     async for message in messages:
-                        yield HelloReply(message=message.name)
+                        await yield_(HelloReply(message=message.name))
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
                 async def worker(channel):
                     stub = GreeterStub(channel)
                     data = self.random_payload()
+
+                    @async_generator
                     async def gen():
                         for _ in range(4):
-                            yield HelloRequest(name=data)
+                            await yield_(HelloRequest(name=data))
                     self.assertEqual(
                         (await stub.SayHello(HelloRequest(name=data))).message,
                         data
                     )
                     self.assertEqual(
-                        [response.message async for response in
-                            stub.SayHelloGoodbye(HelloRequest(name=data))],
+                        [response.message for response in await self.async_iterable_to_list(
+                            stub.SayHelloGoodbye(HelloRequest(name=data)))],
                         [data, data]
                     )
                     self.assertEqual(
@@ -296,7 +311,8 @@ class TestClientServerCodegen(PureRPCTestCase):
                         data + data + data + data
                     )
                     self.assertEqual(
-                        [response.message async for response in stub.SayHelloToMany(gen())],
+                        [response.message for response in await self.async_iterable_to_list(
+                            stub.SayHelloToMany(gen()))],
                         [data, data, data, data]
                     )
 
@@ -315,21 +331,25 @@ class TestClientServerCodegen(PureRPCTestCase):
             GreeterStub = grpc_module.GreeterStub
 
             class Servicer(GreeterServicer):
+                @async_generator
                 async def SayHelloToMany(self, messages):
                     data = ""
                     async for message in messages:
                         data += message.name
-                    yield HelloReply(message=data)
+                    await yield_(HelloReply(message=data))
 
             with self.run_purerpc_service_in_process(Servicer().service) as port:
                 async def worker(channel):
                     stub = GreeterStub(channel)
                     data = self.random_payload(min_size=32000, max_size=64000)
+
+                    @async_generator
                     async def gen():
                         for _ in range(20):
-                            yield HelloRequest(name=data)
+                            await yield_(HelloRequest(name=data))
                     self.assertEqual(
-                        [response.message async for response in stub.SayHelloToMany(gen())],
+                        [response.message for response in await self.async_iterable_to_list(
+                            stub.SayHelloToMany(gen()))],
                         [data * 20]
                     )
 
