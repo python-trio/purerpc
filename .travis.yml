@@ -10,7 +10,7 @@ stages:
     if: tag IS present AND type != pull_request
 env:
   # We run pypy tests first because they run the slowest
-  - PYTHON_IMAGE="pypy:3 PURERPC_BACKEND="asyncio"
+  - PYTHON_IMAGE="pypy:3" PURERPC_BACKEND="asyncio"
   - PYTHON_IMAGE="pypy:3" PURERPC_BACKEND="curio"
   - PYTHON_IMAGE="pypy:3" PURERPC_BACKEND="trio"
   - PYTHON_IMAGE="standy/pypy:3.6-6.1.0" PURERPC_BACKEND="asyncio"

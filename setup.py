@@ -2,6 +2,8 @@ import re
 import os
 from setuptools import setup, find_packages
 
+exec(open("src/purerpc/_version.py", encoding="utf-8").read())
+
 
 def read(*names, **kwargs):
     with open(os.path.join(os.path.dirname(__file__), *names), "r") as fin:
@@ -12,7 +14,7 @@ def main():
     console_scripts = ['protoc-gen-purerpc=purerpc.protoc_plugin.plugin:main']
     setup(
         name="purerpc",
-        version="0.1.6",
+        version=__version__,
         license="Apache License Version 2.0",
         description="Asynchronous pure python gRPC server and client implementation using curio "
                     "and hyper-h2.",

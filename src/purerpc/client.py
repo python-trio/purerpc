@@ -16,14 +16,12 @@ class _Channel(async_exit_stack.AsyncExitStack):
         self._host = host
         self._port = port
         self._grpc_socket = None
-        self._task_group = None
 
     async def __aenter__(self):
         await super().__aenter__()  # Does nothing
 
         background_task_group = await self.enter_async_context(anyio.create_task_group())
         self.push_async_callback(background_task_group.cancel_scope.cancel)
-        self._task_group = await self.enter_async_context(anyio.create_task_group())
 
         socket = await anyio.connect_tcp(self._host, self._port, autostart_tls=False, tls_standard_compatible=False)
         config = GRPCConfiguration(client_side=True)
@@ -57,10 +55,10 @@ class Client:
         stream_fn = functools.partial(self.rpc, method_name, signature.request_type,
                                       signature.response_type)
         if signature.cardinality == Cardinality.STREAM_STREAM:
-            return ClientStubStreamStream(stream_fn, self.channel._task_group)
+            return ClientStubStreamStream(stream_fn)
         elif signature.cardinality == Cardinality.UNARY_STREAM:
-            return ClientStubUnaryStream(stream_fn, self.channel._task_group)
+            return ClientStubUnaryStream(stream_fn)
         elif signature.cardinality == Cardinality.STREAM_UNARY:
-            return ClientStubStreamUnary(stream_fn, self.channel._task_group)
+            return ClientStubStreamUnary(stream_fn)
         else:
-            return ClientStubUnaryUnary(stream_fn, self.channel._task_group)
+            return ClientStubUnaryUnary(stream_fn)

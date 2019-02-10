@@ -4,7 +4,7 @@ import grpc
 import typing
 import time
 
-from async_generator import async_generator, yield_
+from async_generator import async_generator, aclosing, yield_
 
 from .greeter_pb2 import HelloReply, HelloRequest
 from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
@@ -60,7 +60,7 @@ class TestClientServerErrors(PureRPCTestCase):
 
             @async_generator
             async def generator():
-                for _ in range(10):
+                for _ in range(7):
                     await yield_(HelloRequest())
 
             GreeterStub = grpc_module.GreeterStub
@@ -69,11 +69,11 @@ class TestClientServerErrors(PureRPCTestCase):
                 with self.assertRaisesRegex(purerpc.RpcFailedError, r"oops my bad"):
                     await stub.SayHello(HelloRequest(name="World"))
 
-                aiter = stub.SayHelloToMany(generator())
-                for _ in range(7):
-                    await aiter.__anext__()
-                with self.assertRaisesRegex(purerpc.RpcFailedError, r"Lucky 7"):
-                    await aiter.__anext__()
+                async with aclosing(stub.SayHelloToMany(generator())) as aiter:
+                    for _ in range(7):
+                        await aiter.__anext__()
+                    with self.assertRaisesRegex(purerpc.RpcFailedError, r"Lucky 7"):
+                        await aiter.__anext__()
 
             async def main():
                 async with purerpc.insecure_channel("localhost", port) as channel:
