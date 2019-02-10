@@ -1,6 +1,7 @@
 # purerpc
 
-[![Build Status](https://travis-ci.org/standy66/purerpc.png?branch=master)](https://travis-ci.org/standy66/purerpc)
+[![Build Status](https://img.shields.io/travis/standy66/purerpc.svg?style=flat)](https://travis-ci.org/standy66/purerpc)
+[![PyPI version](https://img.shields.io/pypi/v/purerpc.svg?style=flat)](https://pypi.org/project/purerpc/)
 [![Downloads](https://pepy.tech/badge/purerpc/month)](https://pepy.tech/project/purerpc)
 
 Asynchronous pure Python gRPC client and server implementation supporting
