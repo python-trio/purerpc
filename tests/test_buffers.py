@@ -1,74 +1,71 @@
 import zlib
-import unittest
 import random
 import struct
+
+import pytest
+
 from purerpc.grpclib.buffers import ByteBuffer, MessageReadBuffer
 
+byte_buffer = pytest.fixture(lambda: ByteBuffer())
+byte_array = pytest.fixture(lambda: bytearray())
 
-class TestByteBuffer(unittest.TestCase):
-    def test_byte_buffer_random(self):
-        byte_buffer = ByteBuffer()
-        byte_array = bytearray()
-        for i in range(1000):
-            data = bytes(random.randint(0, 255) for _ in range(random.randint(0, 100)))
+
+def test_byte_buffer_random(byte_buffer, byte_array):
+    for i in range(1000):
+        data = bytes(random.randint(0, 255) for _ in range(random.randint(0, 100)))
+        byte_buffer.append(data)
+        byte_array.extend(data)
+        assert len(byte_buffer) == len(byte_array)
+        num_elements = min(random.randint(0, 100), len(byte_buffer))
+        assert byte_array[:num_elements] == byte_buffer.popleft(num_elements)
+        byte_array = byte_array[num_elements:]
+
+
+def test_byte_buffer_large_reads(byte_buffer, byte_array):
+    for i in range(1000):
+        for j in range(100):
+            data = bytes([(i + j) % 256])
             byte_buffer.append(data)
             byte_array.extend(data)
-            self.assertEqual(len(byte_buffer), len(byte_array))
+        assert len(byte_array) == len(byte_buffer)
+        num_elements = min(random.randint(0, 100), len(byte_buffer))
+        assert byte_array[:num_elements] == byte_buffer.popleft(num_elements)
+        byte_array = byte_array[num_elements:]
+
+
+def test_byte_buffer_large_writes(byte_buffer, byte_array):
+    data = bytes(range(256)) * 10
+    for i in range(250):
+        byte_buffer.append(data)
+        byte_array.extend(data)
+        for j in range(10):
+            assert len(byte_array) == len(byte_buffer)
             num_elements = min(random.randint(0, 100), len(byte_buffer))
-            self.assertEqual(byte_array[:num_elements], byte_buffer.popleft(num_elements))
+            assert byte_array[:num_elements] == byte_buffer.popleft(num_elements)
             byte_array = byte_array[num_elements:]
 
-    def test_byte_buffer_large_reads(self):
-        byte_buffer = ByteBuffer()
-        byte_array = bytearray()
-        for i in range(1000):
-            for j in range(100):
-                data = bytes([(i + j) % 256])
-                byte_buffer.append(data)
-                byte_array.extend(data)
-            self.assertEqual(len(byte_array), len(byte_buffer))
-            num_elements = min(random.randint(0, 100), len(byte_buffer))
-            self.assertEqual(byte_array[:num_elements], byte_buffer.popleft(num_elements))
-            byte_array = byte_array[num_elements:]
 
-    def test_byte_buffer_large_writes(self):
-        byte_buffer = ByteBuffer()
-        byte_array = bytearray()
-        data = bytes(range(256)) * 10
-        for i in range(250):
-            byte_buffer.append(data)
-            byte_array.extend(data)
-            for j in range(10):
-                self.assertEqual(len(byte_array), len(byte_buffer))
-                num_elements = min(random.randint(0, 100), len(byte_buffer))
-                self.assertEqual(byte_array[:num_elements], byte_buffer.popleft(num_elements))
-                byte_array = byte_array[num_elements:]
+def test_message_read_buffer(byte_array):
+    for i in range(100):
+        data = bytes(range(i))
+        compress_flag = False
+        if i % 2:
+            data = zlib.compress(data)
+            compress_flag = True
+        byte_array.extend(struct.pack('>?I', compress_flag, len(data)))
+        byte_array.extend(data)
 
+    read_buffer = MessageReadBuffer(message_encoding="gzip")
+    messages = []
+    while byte_array:
+        if random.choice([True, False]):
+            num_bytes = random.randint(0, 50)
+            read_buffer.data_received(bytes(byte_array[:num_bytes]))
+            byte_array = byte_array[num_bytes:]
+        else:
+            messages.extend(read_buffer.read_all_complete_messages())
+    messages.extend(read_buffer.read_all_complete_messages())
 
-class TestMessageReadBuffer(unittest.TestCase):
-    def test_message_read_buffer(self):
-        buffer = bytearray()
-        for i in range(100):
-            data = bytes(range(i))
-            compress_flag = False
-            if i % 2:
-                data = zlib.compress(data)
-                compress_flag = True
-            buffer.extend(struct.pack('>?I', compress_flag, len(data)))
-            buffer.extend(data)
-
-        read_buffer = MessageReadBuffer(message_encoding="gzip")
-        messages = []
-        while buffer:
-            if random.choice([True, False]):
-                num_bytes = random.randint(0, 50)
-                read_buffer.data_received(bytes(buffer[:num_bytes]))
-                buffer = buffer[num_bytes:]
-            else:
-                messages.extend(read_buffer.read_all_complete_messages())
-        messages.extend(read_buffer.read_all_complete_messages())
-
-        self.assertEqual(len(messages), 100)
-        for idx, message in enumerate(messages):
-            self.assertEqual(message, bytes(range(idx)))
-
+    assert len(messages) == 100
+    for idx, message in enumerate(messages):
+        assert message == bytes(range(idx))
