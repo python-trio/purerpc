@@ -16,8 +16,7 @@ def main():
         name="purerpc",
         version=__version__,
         license="Apache License Version 2.0",
-        description="Asynchronous pure python gRPC server and client implementation using curio "
-                    "and hyper-h2.",
+        description="Asynchronous pure Python gRPC client and server implementation supporting asyncio, curio and trio",
         long_description='%s\n%s' % (
             re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.md')),
             re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read('RELEASE.md'))
