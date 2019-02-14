@@ -1,123 +1,142 @@
 import functools
-import time
+import pickle
+import base64
+import re
 
-import anyio
-import grpc
 import pytest
 
-from .greeter_pb2 import HelloReply, HelloRequest
-from .greeter_pb2_grpc import GreeterStub, GreeterServicer, add_GreeterServicer_to_server
-from purerpc import *
-from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process
+import purerpc
+from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
+    grpc_client_parallelize, async_test, purerpc_channel
 
 
-def test_purerpc_server_grpc_client_wrong_service_name():
-    service = Service("some_package.SomeWrongServiceName")
+def regex_and(first, second):
+    return re.compile(r"(?=.*{first})(?=.*{second}).*".format(first=first, second=second), flags=re.DOTALL)
+
+
+STATUS_CODES = [
+    (purerpc.CancelledError, "CANCELLED", "detailed message"),
+    (purerpc.UnknownError, "UNKNOWN", "detailed message"),
+    (purerpc.InvalidArgumentError, "INVALID_ARGUMENT", "detailed message"),
+    (purerpc.DeadlineExceededError, "DEADLINE_EXCEEDED", "detailed message"),
+    (purerpc.NotFoundError, "NOT_FOUND", "detailed message"),
+    (purerpc.AlreadyExistsError, "ALREADY_EXISTS", "detailed message"),
+    (purerpc.PermissionDeniedError, "PERMISSION_DENIED", "detailed message"),
+    (purerpc.ResourceExhaustedError, "RESOURCE_EXHAUSTED", "detailed message"),
+    (purerpc.FailedPreconditionError, "FAILED_PRECONDITION", "detailed message"),
+    (purerpc.AbortedError, "ABORTED", "detailed message"),
+    (purerpc.OutOfRangeError, "OUT_OF_RANGE", "detailed message"),
+    (purerpc.UnimplementedError, "UNIMPLEMENTED", "detailed message"),
+    (purerpc.InternalError, "INTERNAL", "detailed message"),
+    (purerpc.UnavailableError, "UNAVAILABLE", "detailed message"),
+    (purerpc.DataLossError, "DATA_LOSS", "detailed message"),
+    (purerpc.UnauthenticatedError, "UNAUTHENTICATED", "detailed message"),
+]
+
+
+@pytest.fixture(scope="module")
+def purerpc_port(greeter_pb2):
+    service = purerpc.Service("Greeter")
 
     @service.rpc("SayHello")
-    async def say_hello(message: HelloRequest) -> HelloReply:
-        return HelloReply(message="Hello, " + message.name)
+    async def say_hello(message: greeter_pb2.HelloRequest) -> greeter_pb2.HelloReply:
+        status_code_tuple = pickle.loads(base64.b64decode(message.name))
+        raise status_code_tuple[0](status_code_tuple[2])
 
     with run_purerpc_service_in_process(service) as port:
-        with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
-            stub = GreeterStub(channel)
-            with pytest.raises(grpc._channel._Rendezvous, match=r"not implemented"):
-                stub.SayHello(HelloRequest(name="World"))
+        yield port
 
 
-def test_purerpc_server_grpc_client_wrong_method_name():
-    service = Service("Greeter")
+@pytest.fixture(scope="module")
+def grpc_port(greeter_pb2, greeter_pb2_grpc):
+    class Servicer(greeter_pb2_grpc.GreeterServicer):
+        def SayHello(self, message, context):
+            import grpc
+            status_code_tuple = pickle.loads(base64.b64decode(message.name))
+            context.abort(getattr(grpc.StatusCode, status_code_tuple[1]), status_code_tuple[2])
+
+    with run_grpc_service_in_process(functools.partial(
+            greeter_pb2_grpc.add_GreeterServicer_to_server, Servicer())) as port:
+        yield port
+
+
+@pytest.fixture(scope="module",
+                params=["purerpc_port", "grpc_port"])
+def port(request):
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def purerpc_server_wrong_service_name_port(greeter_pb2):
+    service = purerpc.Service("some_package.SomeWrongServiceName")
+
+    @service.rpc("SayHello")
+    async def say_hello(message: greeter_pb2.HelloRequest) -> greeter_pb2.HelloReply:
+        return greeter_pb2.HelloReply(message="Hello, " + message.name)
+
+    with run_purerpc_service_in_process(service) as port:
+        yield port
+
+
+@pytest.fixture
+def purerpc_server_wrong_method_name_port(greeter_pb2):
+    service = purerpc.Service("Greeter")
 
     @service.rpc("SomeOtherMethod")
-    async def say_hello(message: HelloRequest) -> HelloReply:
-        return HelloReply(message="Hello, " + message.name)
+    async def say_hello(message: greeter_pb2.HelloRequest) -> greeter_pb2.HelloReply:
+        return greeter_pb2.HelloReply(message="Hello, " + message.name)
 
     with run_purerpc_service_in_process(service) as port:
-        with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
-            stub = GreeterStub(channel)
-            with pytest.raises(grpc._channel._Rendezvous, match=r"not implemented"):
-                stub.SayHello(HelloRequest(name="World"))
+        yield port
 
 
-def test_grpc_server_purerpc_client_wrong_method_name(greeter_grpc):
-    class Servicer(GreeterServicer):
-        def SayHelloGoodbye(self, message, context):
-            yield HelloReply(message="Hello, " + message.name)
-            time.sleep(0.05)
-            yield HelloReply(message="Goodbye, " + message.name)
+@pytest.fixture
+def grpc_empty_servicer_port(greeter_pb2_grpc):
+    class Servicer(greeter_pb2_grpc.GreeterServicer):
+        pass
 
-    with run_grpc_service_in_process(functools.partial(add_GreeterServicer_to_server, Servicer())) as port:
-        GreeterStub = greeter_grpc.GreeterStub
-        async def main():
-            async with insecure_channel("localhost", port) as channel:
-                stub = GreeterStub(channel)
-                with pytest.raises(UnimplementedError):
-                    await stub.SayHello(HelloRequest(name="World"))
-        anyio.run(main)
+    with run_grpc_service_in_process(functools.partial(
+            greeter_pb2_grpc.add_GreeterServicer_to_server, Servicer())) as port:
+        yield port
 
 
-def test_purerpc_server_grpc_client_status_codes():
-    def test(error_to_raise, regex_to_check):
-        service = Service("Greeter")
-
-        @service.rpc("SayHello")
-        async def say_hello(message: HelloRequest) -> HelloReply:
-            raise error_to_raise
-
-        with run_purerpc_service_in_process(service) as port:
-            with grpc.insecure_channel('127.0.0.1:{}'.format(port)) as channel:
-                stub = GreeterStub(channel)
-                with pytest.raises(grpc._channel._Rendezvous, match=regex_to_check):
-                    stub.SayHello(HelloRequest(name="World"))
-
-    test(CancelledError, "CANCELLED")
-    test(UnknownError, "UNKNOWN")
-    test(InvalidArgumentError, "INVALID_ARGUMENT")
-    test(DeadlineExceededError, "DEADLINE_EXCEEDED")
-    test(NotFoundError, "NOT_FOUND")
-    test(AlreadyExistsError, "ALREADY_EXISTS")
-    test(PermissionDeniedError, "PERMISSION_DENIED")
-    test(ResourceExhaustedError, "RESOURCE_EXHAUSTED")
-    test(FailedPreconditionError, "FAILED_PRECONDITION")
-    test(AbortedError, "ABORTED")
-    test(OutOfRangeError, "OUT_OF_RANGE")
-    test(UnimplementedError, "UNIMPLEMENTED")
-    test(InternalError, "INTERNAL")
-    test(UnavailableError, "UNAVAILABLE")
-    test(DataLossError, "DATA_LOSS")
-    test(UnauthenticatedError, "UNAUTHENTICATED")
+@grpc_client_parallelize(1)
+@grpc_channel("purerpc_server_wrong_service_name_port")
+def test_grpc_client_wrong_service_name(greeter_pb2, greeter_pb2_grpc, channel):
+    stub = greeter_pb2_grpc.GreeterStub(channel)
+    with pytest.raises(BaseException, match=r"not implemented"):
+        stub.SayHello(greeter_pb2.HelloRequest(name="World"))
 
 
-def test_purerpc_server_purerpc_client_status_codes(greeter_grpc):
-    def test(error_to_raise, regex_to_check):
-        service = Service("Greeter")
+@grpc_client_parallelize(1)
+@grpc_channel("purerpc_server_wrong_method_name_port")
+def test_grpc_client_wrong_method_name(greeter_pb2, greeter_pb2_grpc, channel):
+    stub = greeter_pb2_grpc.GreeterStub(channel)
+    with pytest.raises(BaseException, match=r"not implemented"):
+        stub.SayHello(greeter_pb2.HelloRequest(name="World"))
 
-        @service.rpc("SayHello")
-        async def say_hello(message: HelloRequest) -> HelloReply:
-            raise error_to_raise
+@async_test
+@purerpc_channel("grpc_empty_servicer_port")
+async def test_urerpc_client_empty_servicer(greeter_pb2, greeter_grpc, channel):
+    stub = greeter_grpc.GreeterStub(channel)
+    with pytest.raises(purerpc.UnimplementedError):
+        await stub.SayHello(greeter_pb2.HelloRequest(name="World"))
 
-        with run_purerpc_service_in_process(service) as port:
-            GreeterStub = greeter_grpc.GreeterStub
-            async def main():
-                async with insecure_channel("localhost", port) as channel:
-                    stub = GreeterStub(channel)
-                    with pytest.raises(error_to_raise, match=regex_to_check):
-                        await stub.SayHello(HelloRequest(name="World"))
-            anyio.run(main)
 
-    test(CancelledError, "CANCELLED")
-    test(UnknownError, "UNKNOWN")
-    test(InvalidArgumentError, "INVALID_ARGUMENT")
-    test(DeadlineExceededError, "DEADLINE_EXCEEDED")
-    test(NotFoundError, "NOT_FOUND")
-    test(AlreadyExistsError, "ALREADY_EXISTS")
-    test(PermissionDeniedError, "PERMISSION_DENIED")
-    test(ResourceExhaustedError, "RESOURCE_EXHAUSTED")
-    test(FailedPreconditionError, "FAILED_PRECONDITION")
-    test(AbortedError, "ABORTED")
-    test(OutOfRangeError, "OUT_OF_RANGE")
-    test(UnimplementedError, "UNIMPLEMENTED")
-    test(InternalError, "INTERNAL")
-    test(UnavailableError, "UNAVAILABLE")
-    test(DataLossError, "DATA_LOSS")
-    test(UnauthenticatedError, "UNAUTHENTICATED")
+@pytest.mark.parametrize("status_code_tuple", STATUS_CODES)
+@grpc_client_parallelize(1)
+@grpc_channel("purerpc_port")
+def test_grpc_client_status_codes(status_code_tuple, greeter_pb2, greeter_pb2_grpc, channel):
+    stub = greeter_pb2_grpc.GreeterStub(channel)
+    with pytest.raises(BaseException, match=regex_and(status_code_tuple[1], status_code_tuple[2])):
+        stub.SayHello(greeter_pb2.HelloRequest(name=base64.b64encode(pickle.dumps(status_code_tuple))))
+
+
+@pytest.mark.parametrize("status_code_tuple", STATUS_CODES)
+@async_test
+@purerpc_channel("port")
+async def test_purerpc_client_status_codes(status_code_tuple, greeter_pb2, greeter_grpc, channel):
+    purerpc_exception = status_code_tuple[0]
+    stub = greeter_grpc.GreeterStub(channel)
+    with pytest.raises(purerpc_exception, match=regex_and(status_code_tuple[1], status_code_tuple[2])):
+        await stub.SayHello(greeter_pb2.HelloRequest(name=base64.b64encode(pickle.dumps(status_code_tuple))))

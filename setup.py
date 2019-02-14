@@ -61,7 +61,6 @@ def main():
         ],
         entry_points={
             "console_scripts": console_scripts,
-            # "pytest11": ["purerpc = purerpc.pytest_plugin"],
         },
         setup_requires=["pytest-runner"],
         tests_require=[
