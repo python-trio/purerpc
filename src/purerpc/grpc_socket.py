@@ -219,7 +219,7 @@ class GRPCSocket:
                     await yield_(self._streams[event.stream_id])
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._decref_stream(event.stream_id)
-            await self._socket.try_flush()
+            # await self._socket.flush()
 
     async def _listener_thread(self):
         async for _ in self._listen():

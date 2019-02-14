@@ -123,7 +123,7 @@ class Server:
         socket = self._create_socket_and_listen()
         anyio.run(self._run_async_server, socket, backend=backend)
 
-    def serve(self, backend="asyncio"):
+    def serve(self, backend=None):
         if self.num_processes == 1:
             self._target_fn(backend)
         else:
