@@ -15,7 +15,11 @@ def _new_run(func, *args, backend=None, backend_options=None):
     if backend is None:
         backend = os.getenv("PURERPC_BACKEND", "asyncio")
     log.info("Selected {} backend".format(backend))
-    _anyio_run(func, *args, backend=backend, backend_options=backend_options)
+    if backend == "uvloop":
+        import uvloop
+        uvloop.install()
+        backend = "asyncio"
+    return _anyio_run(func, *args, backend=backend, backend_options=backend_options)
 
 
 async def _new_sendall(self, data, *, flags=0):

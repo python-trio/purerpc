@@ -2,6 +2,7 @@ import functools
 import collections
 import subprocess
 import multiprocessing
+import multiprocessing.connection
 import tempfile
 import shutil
 import os
@@ -13,17 +14,17 @@ import contextlib
 import time
 import random
 import string
-from queue import Empty as QueueEmpty
 
 from tblib import pickling_support
 pickling_support.install()
 
+import forge
 import anyio
 from async_generator import aclosing
 
 
 @contextlib.contextmanager
-def compile_temp_proto(*relative_proto_paths):
+def compile_temp_proto(*relative_proto_paths, add_pb2_grpc_module=False):
     modules = []
     with tempfile.TemporaryDirectory() as temp_dir:
         sys.path.insert(0, temp_dir)
@@ -50,8 +51,10 @@ def compile_temp_proto(*relative_proto_paths):
                 pb2_module = importlib.import_module(pb2_module_name)
                 pb2_grpc_module = importlib.import_module(pb2_grpc_module_name)
                 grpc_module = importlib.import_module(grpc_module_name)
-
-                modules.extend((pb2_module, grpc_module))
+                if add_pb2_grpc_module:
+                    modules.extend((pb2_module, pb2_grpc_module, grpc_module))
+                else:
+                    modules.extend((pb2_module, grpc_module))
             yield modules
         finally:
             sys.path.remove(temp_dir)
@@ -60,18 +63,17 @@ def compile_temp_proto(*relative_proto_paths):
 WrappedResult = collections.namedtuple("WrappedResult", ("result", "exc_info"))
 
 
-def wrap_gen_in_process(queue):
+def wrap_gen_in_process(conn: multiprocessing.connection.Connection):
     def decorator(gen):
         @functools.wraps(gen)
         def new_func(*args, **kwargs):
             try:
                 for elem in gen(*args, **kwargs):
-                    queue.put(WrappedResult(result=elem, exc_info=None))
+                    conn.send(WrappedResult(result=elem, exc_info=None))
             except:
-                queue.put(WrappedResult(result=None, exc_info=sys.exc_info()))
+                conn.send(WrappedResult(result=None, exc_info=sys.exc_info()))
             finally:
-                queue.close()
-                queue.join_thread()
+                conn.close()
         return new_func
     return decorator
 
@@ -88,31 +90,30 @@ def random_payload(min_size=1000, max_size=100000):
     return "".join(random.choice(string.ascii_letters)
                    for _ in range(random.randint(min_size, max_size)))
 
+
 @contextlib.contextmanager
 def run_context_manager_generator_in_process(cm_gen):
-    queue = multiprocessing.Queue()
-    target_fn = wrap_gen_in_process(queue)(cm_gen)
+    parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
+    target_fn = wrap_gen_in_process(child_conn)(cm_gen)
 
     process = multiprocessing.Process(target=target_fn)
     process.start()
     try:
-        wrapped_result = queue.get()
+        wrapped_result = parent_conn.recv()
         if wrapped_result.exc_info is not None:
             raise wrapped_result.exc_info[0].with_traceback(*wrapped_result.exc_info[1:])
         else:
             yield wrapped_result.result
     finally:
         try:
-            exc_info = queue.get_nowait().exc_info
-            if exc_info is not None:
-                raise exc_info[0].with_traceback(*exc_info[1:])
-        except QueueEmpty:
-            pass
+            if parent_conn.poll():
+                exc_info = parent_conn.recv().exc_info
+                if exc_info is not None:
+                    raise exc_info[0].with_traceback(*exc_info[1:])
         finally:
             process.terminate()
             process.join()
-            queue.close()
-            queue.join_thread()
+            parent_conn.close()
 
 
 def run_purerpc_service_in_process(service):
@@ -140,9 +141,9 @@ def run_grpc_service_in_process(add_handler_fn):
 
 
 def run_tests_in_workers(*, target, num_workers):
-    queue = multiprocessing.Queue()
+    parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
 
-    @wrap_gen_in_process(queue)
+    @wrap_gen_in_process(child_conn)
     def target_fn():
         target()
         yield
@@ -153,11 +154,84 @@ def run_tests_in_workers(*, target, num_workers):
 
     try:
         for _ in range(num_workers):
-            wrapped_result = queue.get()
+            wrapped_result = parent_conn.recv()
             if wrapped_result.exc_info is not None:
                 raise wrapped_result.exc_info[0].with_traceback(*wrapped_result.exc_info[1:])
     finally:
-        queue.close()
-        queue.join_thread()
+        parent_conn.close()
         for process in processes:
             process.join()
+
+
+def async_test(corofunc):
+    if not inspect.iscoroutinefunction(corofunc):
+        raise TypeError("Expected coroutine function")
+
+    @functools.wraps(corofunc)
+    def func(**kwargs):
+        return anyio.run(functools.partial(corofunc, **kwargs))
+    return func
+
+
+def grpc_client_parallelize(num_workers):
+    def decorator(func):
+        @functools.wraps(func)
+        def new_func(*args, **kwargs):
+            def target():
+                func(*args, **kwargs)
+            run_tests_in_workers(target=target, num_workers=num_workers)
+
+        new_func.__parallelized__ = True
+        return new_func
+    return decorator
+
+
+def purerpc_client_parallelize(num_tasks):
+    def decorator(corofunc):
+        if not inspect.iscoroutinefunction(corofunc):
+            raise TypeError("Expected coroutine function")
+
+        @functools.wraps(corofunc)
+        async def new_corofunc(**kwargs):
+            async with anyio.create_task_group() as tg:
+                for _ in range(num_tasks):
+                    await tg.spawn(functools.partial(corofunc, **kwargs))
+        return new_corofunc
+    return decorator
+
+
+def grpc_channel(port_fixture_name, channel_arg_name="channel"):
+    def decorator(func):
+        if hasattr(func, "__parallelized__") and func.__parallelized__:
+            raise TypeError("Cannot pass gRPC channel to already parallelized test, grpc_client_parallelize should "
+                            "be the last decorator in chain")
+
+        @forge.compose(
+            forge.copy(func),
+            forge.modify(channel_arg_name, name=port_fixture_name, interface_name="port_fixture_value"),
+        )
+        def new_func(*, port_fixture_value, **kwargs):
+            import grpc
+            with grpc.insecure_channel('127.0.0.1:{}'.format(port_fixture_value)) as channel:
+                func(**kwargs, channel=channel)
+
+        return new_func
+    return decorator
+
+
+def purerpc_channel(port_fixture_name, channel_arg_name="channel"):
+    def decorator(corofunc):
+        if not inspect.iscoroutinefunction(corofunc):
+            raise TypeError("Expected coroutine function")
+
+        @forge.compose(
+            forge.copy(corofunc),
+            forge.modify(channel_arg_name, name=port_fixture_name, interface_name="port_fixture_value"),
+        )
+        async def new_corofunc(*, port_fixture_value, **kwargs):
+            import purerpc
+            async with purerpc.insecure_channel("127.0.0.1", port_fixture_value) as channel:
+                await corofunc(**kwargs, channel=channel)
+
+        return new_corofunc
+    return decorator

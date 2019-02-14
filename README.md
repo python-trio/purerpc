@@ -6,6 +6,7 @@
 
 Asynchronous pure Python gRPC client and server implementation supporting
 [asyncio](https://docs.python.org/3/library/asyncio.html),
+[uvloop](https://github.com/MagicStack/uvloop),
 [curio](https://github.com/dabeaz/curio) and
 [trio](https://github.com/python-trio/trio) (achieved with [anyio](https://github.com/agronholm/anyio) compatibility layer).
 
@@ -28,7 +29,7 @@ Latest development version:
 pip install git+https://github.com/standy66/purerpc.git
 ```
 
-By default purerpc uses asyncio event loop, if you want to use curio or trio, please install them manually.
+By default purerpc uses asyncio event loop, if you want to use uvloop, curio or trio, please install them manually.
 
 ## protoc plugin
 
@@ -72,13 +73,13 @@ class Greeter(GreeterServicer):
 
 server = Server(50055)
 server.add_service(Greeter().service)
-server.serve(backend="asyncio")
+server.serve(backend="asyncio")  # backend can also be one of: "uvloop", "curio", "trio"
 ```
 
 ### Client
 
 ```python
-import curio
+import anyio
 import purerpc
 from greeter_pb2 import HelloRequest, HelloReply
 from greeter_grpc import GreeterStub
@@ -100,7 +101,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    curio.run(main)  # Or trio.run(main), or run in asyncio event loop
+    anyio.run(main, backend="asyncio")  # backend can also be one of: "uvloop", "curio", "trio"
 ```
 
 You can mix server and client code, for example make a server that requests something using purerpc from another gRPC server, etc.

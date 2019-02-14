@@ -7,7 +7,6 @@ service Greeter {
   rpc SayHelloToManyAtOnce (stream HelloRequest) returns (HelloReply) {}
 }
 
-
 message HelloRequest {
   string name = 1;
 }
