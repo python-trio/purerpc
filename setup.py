@@ -76,8 +76,6 @@ def main():
         setup_requires=["pytest-runner"],
         tests_require=[
             "pytest",
-            "pytest-xdist",
-            "pytest-forked",
             "grpcio_tools",
             "grpcio"
         ]

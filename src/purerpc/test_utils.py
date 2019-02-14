@@ -24,7 +24,7 @@ from async_generator import aclosing
 
 
 @contextlib.contextmanager
-def compile_temp_proto(*relative_proto_paths, add_pb2_grpc_module=False):
+def compile_temp_proto(*relative_proto_paths):
     modules = []
     with tempfile.TemporaryDirectory() as temp_dir:
         sys.path.insert(0, temp_dir)
@@ -51,10 +51,7 @@ def compile_temp_proto(*relative_proto_paths, add_pb2_grpc_module=False):
                 pb2_module = importlib.import_module(pb2_module_name)
                 pb2_grpc_module = importlib.import_module(pb2_grpc_module_name)
                 grpc_module = importlib.import_module(grpc_module_name)
-                if add_pb2_grpc_module:
-                    modules.extend((pb2_module, pb2_grpc_module, grpc_module))
-                else:
-                    modules.extend((pb2_module, grpc_module))
+                modules.extend((pb2_module, pb2_grpc_module, grpc_module))
             yield modules
         finally:
             sys.path.remove(temp_dir)

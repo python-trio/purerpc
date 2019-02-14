@@ -5,7 +5,7 @@ from purerpc.test_utils import compile_temp_proto
 
 @pytest.fixture(scope="session")
 def greeter_modules():
-    with compile_temp_proto("data/greeter.proto", add_pb2_grpc_module=True) as modules:
+    with compile_temp_proto("data/greeter.proto") as modules:
         yield modules
 
 
@@ -26,7 +26,7 @@ def greeter_grpc(greeter_modules):
 
 @pytest.fixture(scope="session")
 def echo_modules():
-    with compile_temp_proto("data/echo.proto", add_pb2_grpc_module=True) as modules:
+    with compile_temp_proto("data/echo.proto") as modules:
         yield modules
 
 
