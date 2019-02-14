@@ -1,3 +1,18 @@
+# [Release 0.3.0](https://github.com/standy66/purerpc/compare/v0.2.1...v0.3.0) (2019-02-14)
+
+
+### Features
+
+* expose new functions in purerpc.test_utils ([07b10e1](https://github.com/standy66/purerpc/commit/07b10e1))
+* migrate to pytest ([95c0a8b](https://github.com/standy66/purerpc/commit/95c0a8b))
+
+
+### BREAKING CHANGES
+
+* purerpc.test_utils.PureRPCTestCase is removed
+
+
+
 # [Release 0.2.0](https://github.com/standy66/purerpc/compare/v0.1.6...v0.2.0) (2019-02-10)
 
 
