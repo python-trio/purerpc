@@ -57,18 +57,18 @@ def compile_temp_proto(*relative_proto_paths):
             sys.path.remove(temp_dir)
 
 
-WrappedResult = collections.namedtuple("WrappedResult", ("result", "exc_info"))
+_WrappedResult = collections.namedtuple("WrappedResult", ("result", "exc_info"))
 
 
-def wrap_gen_in_process(conn: multiprocessing.connection.Connection):
+def _wrap_gen_in_process(conn: multiprocessing.connection.Connection):
     def decorator(gen):
         @functools.wraps(gen)
         def new_func(*args, **kwargs):
             try:
                 for elem in gen(*args, **kwargs):
-                    conn.send(WrappedResult(result=elem, exc_info=None))
+                    conn.send(_WrappedResult(result=elem, exc_info=None))
             except:
-                conn.send(WrappedResult(result=None, exc_info=sys.exc_info()))
+                conn.send(_WrappedResult(result=None, exc_info=sys.exc_info()))
             finally:
                 conn.close()
         return new_func
@@ -89,9 +89,9 @@ def random_payload(min_size=1000, max_size=100000):
 
 
 @contextlib.contextmanager
-def run_context_manager_generator_in_process(cm_gen):
+def _run_context_manager_generator_in_process(cm_gen):
     parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
-    target_fn = wrap_gen_in_process(child_conn)(cm_gen)
+    target_fn = _wrap_gen_in_process(child_conn)(cm_gen)
 
     process = multiprocessing.Process(target=target_fn)
     process.start()
@@ -121,7 +121,7 @@ def run_purerpc_service_in_process(service):
         socket = server._create_socket_and_listen()
         yield socket.getsockname()[1]
         anyio.run(server._run_async_server, socket)
-    return run_context_manager_generator_in_process(target_fn)
+    return _run_context_manager_generator_in_process(target_fn)
 
 
 def run_grpc_service_in_process(add_handler_fn):
@@ -134,13 +134,13 @@ def run_grpc_service_in_process(add_handler_fn):
         yield port
         while True:
             time.sleep(60)
-    return run_context_manager_generator_in_process(target_fn)
+    return _run_context_manager_generator_in_process(target_fn)
 
 
 def run_tests_in_workers(*, target, num_workers):
     parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
 
-    @wrap_gen_in_process(child_conn)
+    @_wrap_gen_in_process(child_conn)
     def target_fn():
         target()
         yield

@@ -5,7 +5,7 @@ import pytest
 import traceback
 import multiprocessing
 
-from purerpc.test_utils import run_tests_in_workers, run_context_manager_generator_in_process
+from purerpc.test_utils import run_tests_in_workers, _run_context_manager_generator_in_process
 
 
 def test_run_tests_in_workers_error():
@@ -57,7 +57,7 @@ def test_run_context_manager_generator_in_process():
     def gen():
         yield 42
 
-    with run_context_manager_generator_in_process(gen) as result:
+    with _run_context_manager_generator_in_process(gen) as result:
         assert result == 42
 
 
@@ -66,7 +66,7 @@ def test_run_context_manager_generator_in_process_error_before():
         raise ValueError("42")
 
     with pytest.raises(ValueError, match="42"):
-        with run_context_manager_generator_in_process(gen) as result:
+        with _run_context_manager_generator_in_process(gen) as result:
             assert result == 42
 
 
@@ -76,7 +76,7 @@ def test_run_context_manager_generator_in_process_error_after():
         raise ValueError("42")
 
     with pytest.raises(ValueError, match="42"):
-        with run_context_manager_generator_in_process(gen) as result:
+        with _run_context_manager_generator_in_process(gen) as result:
             assert result == 42
             time.sleep(0.1)
 
@@ -90,7 +90,7 @@ def test_run_context_manager_generator_in_process_error_traceback():
         inner_2()
 
     try:
-        with run_context_manager_generator_in_process(gen):
+        with _run_context_manager_generator_in_process(gen):
             pass
     except ValueError:
         exc_type, exc_value, exc_traceback = sys.exc_info()
