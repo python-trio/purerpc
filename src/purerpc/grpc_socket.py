@@ -21,7 +21,6 @@ class SocketWrapper:
         self._socket = sock
         self._grpc_connection = grpc_connection
         self._write_fifo_lock = anyio.create_lock()
-        self._retry = False
 
     @staticmethod
     def _set_socket_options(sock):
@@ -38,24 +37,10 @@ class SocketWrapper:
 
     async def flush(self):
         """This maybe called from different threads."""
-        async with self._write_fifo_lock:
-            self._retry = True
-            while self._retry:
-                self._retry = False
-                data = self._grpc_connection.data_to_send()
-                if not data:
-                    return
+        data = self._grpc_connection.data_to_send()
+        if data:
+            async with self._write_fifo_lock:
                 await self._socket.send_all(data)
-
-    async def try_flush(self):
-        if self.locked:
-            self._retry = True
-        else:
-            await self.flush()
-
-    @property
-    def locked(self):
-        return self._write_fifo_lock.locked()
 
     async def recv(self, buffer_size: int):
         """This may only be called from single thread."""
@@ -201,6 +186,7 @@ class GRPCSocket:
             if not data:
                 return
             events = self._grpc_connection.receive_data(data)
+            await self._socket.flush()
             for event in events:
                 # TODO: implement this
                 if isinstance(event, h2.events.WindowUpdated):
@@ -219,7 +205,6 @@ class GRPCSocket:
                     await yield_(self._streams[event.stream_id])
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._decref_stream(event.stream_id)
-            # await self._socket.flush()
 
     async def _listener_thread(self):
         async for _ in self._listen():
