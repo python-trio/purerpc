@@ -1,3 +1,12 @@
+# [Release 0.3.1](https://github.com/standy66/purerpc/compare/v0.3.0...v0.3.1) (2019-02-15)
+
+
+### Bug Fixes
+
+* fix pickling error in purerpc.test_utils._WrappedResult ([9f0a63d](https://github.com/standy66/purerpc/commit/9f0a63d))
+
+
+
 # [Release 0.3.0](https://github.com/standy66/purerpc/compare/v0.2.1...v0.3.0) (2019-02-14)
 
 
