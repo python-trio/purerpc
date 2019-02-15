@@ -57,7 +57,7 @@ def compile_temp_proto(*relative_proto_paths):
             sys.path.remove(temp_dir)
 
 
-_WrappedResult = collections.namedtuple("WrappedResult", ("result", "exc_info"))
+_WrappedResult = collections.namedtuple("_WrappedResult", ("result", "exc_info"))
 
 
 def _wrap_gen_in_process(conn: multiprocessing.connection.Connection):
