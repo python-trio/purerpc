@@ -1,4 +1,5 @@
 import sys
+import enum
 import socket
 import datetime
 
@@ -70,6 +71,13 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
         return await self._socket.receive_some(buffer_size)
 
 
+class GRPCStreamState(enum.Enum):
+    OPEN = 1
+    HALF_CLOSED_REMOTE = 2
+    HALF_CLOSED_LOCAL = 3
+    CLOSED = 4
+
+
 class GRPCStream:
     def __init__(self, grpc_connection: GRPCConnection, stream_id: int, socket: SocketWrapper,
                  grpc_socket: "GRPCSocket"):
@@ -79,12 +87,14 @@ class GRPCStream:
         self._socket = socket
         self._flow_control_update_event = anyio.create_event()
         self._incoming_events = anyio.create_queue(sys.maxsize)
-
         self._response_started = False
-        self._closed = False
-        
+        self._state = GRPCStreamState.OPEN
         self._start_stream_event = None
         self._end_stream_event = None
+
+    @property
+    def state(self):
+        return self._state
 
     @property
     def start_stream_event(self):
@@ -105,6 +115,20 @@ class GRPCStream:
     @property
     def debug_prefix(self):
         return "[CLIENT] " if self.client_side else "[SERVER] "
+
+    def _close_remote(self):
+        if self._state == GRPCStreamState.OPEN:
+            self._state = GRPCStreamState.HALF_CLOSED_REMOTE
+        elif self._state == GRPCStreamState.HALF_CLOSED_LOCAL:
+            self._state = GRPCStreamState.CLOSED
+            del self._grpc_socket._streams[self._stream_id]
+
+    def _close_local(self):
+        if self._state == GRPCStreamState.OPEN:
+            self._state = GRPCStreamState.HALF_CLOSED_LOCAL
+        elif self._state == GRPCStreamState.HALF_CLOSED_REMOTE:
+            self._state = GRPCStreamState.CLOSED
+            del self._grpc_socket._streams[self._stream_id]
 
     async def _set_flow_control_update(self):
         await self._flow_control_update_event.set()
@@ -144,9 +168,9 @@ class GRPCStream:
     async def close(self, status=None, content_type_suffix="", custom_metadata=()):
         if self.client_side and (status or custom_metadata):
             raise ValueError("Client side streams cannot be closed with non-default arguments")
-        if self._closed:
+        if self._state in (GRPCStreamState.HALF_CLOSED_LOCAL, GRPCStreamState.CLOSED):
             raise TypeError("Closing already closed stream")
-        self._closed = True
+        self._close_local()
         if self.client_side:
             try:
                 self._grpc_connection.end_request(self._stream_id)
@@ -159,7 +183,6 @@ class GRPCStream:
             self._grpc_connection.respond_status(self._stream_id, status,
                                                  content_type_suffix, custom_metadata)
         await self._socket.flush()
-        self._grpc_socket._decref_stream(self._stream_id)
 
     async def start_response(self, content_type_suffix="", custom_metadata=()):
         if self.client_side:
@@ -180,9 +203,7 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
         self._grpc_connection = GRPCConnection(config=config)
         self._socket = SocketWrapper(self._grpc_connection, sock)
         self._receive_buffer_size = receive_buffer_size
-
         self._streams = {}  # type: Dict[int, GRPCStream]
-        self._streams_count = {}  # type: Dict[int, int]
 
     async def __aenter__(self):
         await super().__aenter__()
@@ -203,16 +224,8 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
         return self.StreamClass(self._grpc_connection, stream_id, self._socket, self)
 
     def _allocate_stream(self, stream_id):
-        stream = self._stream_ctor(stream_id)
-        self._streams[stream_id] = stream
-        self._streams_count[stream_id] = 2
-        return stream
-
-    def _decref_stream(self, stream_id: int):
-        self._streams_count[stream_id] -= 1
-        if self._streams_count[stream_id] == 0:
-            del self._streams[stream_id]
-            del self._streams_count[stream_id]
+        self._streams[stream_id] = self._stream_ctor(stream_id)
+        return self._streams[stream_id]
 
     @async_generator
     async def _listen(self):
@@ -239,7 +252,7 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
                 if isinstance(event, RequestReceived):
                     await yield_(self._streams[event.stream_id])
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
-                    self._decref_stream(event.stream_id)
+                    self._streams[event.stream_id]._close_remote()
 
     async def _reader_thread(self):
         async for _ in self._listen():
