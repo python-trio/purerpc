@@ -1,3 +1,12 @@
+# [Release 0.3.2](https://github.com/standy66/purerpc/compare/v0.3.1...v0.3.2) (2019-02-15)
+
+
+### Bug Fixes
+
+* fix dependencies, remove some of anyio monkey patches ([ac6c5c2](https://github.com/standy66/purerpc/commit/ac6c5c2))
+
+
+
 # [Release 0.3.1](https://github.com/standy66/purerpc/compare/v0.3.0...v0.3.1) (2019-02-15)
 
 
