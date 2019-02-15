@@ -194,16 +194,14 @@ class ConnectionHandler:
             await stream.close(Status(StatusCode.CANCELLED, status_message=repr(sys.exc_info())))
 
     async def __call__(self, socket):
-        self.grpc_socket = GRPCProtoSocket(self.config, socket)
-        await self.grpc_socket.initiate_connection(None)
-
-        # TODO: resource usage warning
-        # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
-        # TODO: do we really need it here?
-        async with anyio.create_task_group() as task_group:
-            # TODO: Should at least pass through GeneratorExit
-            try:
-                async for stream in self.grpc_socket.listen():
-                    await task_group.spawn(self.request_received, stream)
-            except:
-                logging.exception("Got exception in main dispatch loop")
+        async with GRPCProtoSocket(self.config, socket) as self.grpc_socket:
+            # TODO: resource usage warning
+            # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
+            # TODO: do we really need it here?
+            async with anyio.create_task_group() as task_group:
+                # TODO: Should at least pass through GeneratorExit
+                try:
+                    async for stream in self.grpc_socket.listen():
+                        await task_group.spawn(self.request_received, stream)
+                except:
+                    logging.exception("Got exception in main dispatch loop")

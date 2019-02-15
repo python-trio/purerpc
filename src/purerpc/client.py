@@ -19,14 +19,9 @@ class _Channel(async_exit_stack.AsyncExitStack):
 
     async def __aenter__(self):
         await super().__aenter__()  # Does nothing
-
-        background_task_group = await self.enter_async_context(anyio.create_task_group())
-        self.push_async_callback(background_task_group.cancel_scope.cancel)
-
         socket = await anyio.connect_tcp(self._host, self._port, autostart_tls=False, tls_standard_compatible=False)
         config = GRPCConfiguration(client_side=True)
-        self._grpc_socket = GRPCProtoSocket(config, socket)
-        await self._grpc_socket.initiate_connection(background_task_group)
+        self._grpc_socket = await self.enter_async_context(GRPCProtoSocket(config, socket))
         return self
 
 

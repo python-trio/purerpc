@@ -69,3 +69,8 @@ The cons:
 * need to count `flow_controlled_length`s to acknowledge the correct size (also need to set flow controlled length larger than maximum message length in case of padding)
 * need to design more random tests that test identity of the messages before implementing this
 * make perf tests
+
+**UPDATE (2019-02-15)**: Turns out we need `_writer_thread` after all, because we cannot send anything on
+`_listener_thread` (or we would block when both ends try to send very large chunks of data). If we just exclude
+ calls to send from `_listener_thread`, we won't be able to answer PING frames. So instead, we ping `_writer_thread`
+ so it can do the sending for us.

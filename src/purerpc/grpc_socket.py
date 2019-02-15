@@ -3,6 +3,7 @@ import socket
 import datetime
 
 import anyio
+import async_exit_stack
 from async_generator import async_generator, yield_, yield_from_
 import h2
 import h2.events
@@ -15,12 +16,26 @@ from .grpclib.events import RequestReceived, RequestEnded, ResponseEnded, Messag
 from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
 
 
-class SocketWrapper:
+class SocketWrapper(async_exit_stack.AsyncExitStack):
     def __init__(self, grpc_connection: GRPCConnection, sock: anyio._networking.SocketStream):
+        super().__init__()
         self._set_socket_options(sock._socket._raw_socket)
         self._socket = sock
         self._grpc_connection = grpc_connection
-        self._write_fifo_lock = anyio.create_lock()
+        self._flush_event = anyio.create_event()
+        self._running = True
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        task_group = await self.enter_async_context(anyio.create_task_group())
+        await task_group.spawn(self._writer_thread)
+
+        async def callback():
+            self._running = False
+            await self._flush_event.set()
+
+        self.push_async_callback(callback)
+        return self
 
     @staticmethod
     def _set_socket_options(sock):
@@ -35,12 +50,20 @@ class SocketWrapper:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
+    async def _writer_thread(self):
+        while True:
+            data = self._grpc_connection.data_to_send()
+            if data:
+                await self._socket.send_all(data)
+            elif self._running:
+                await self._flush_event.wait()
+                self._flush_event.clear()
+            else:
+                return
+
     async def flush(self):
         """This maybe called from different threads."""
-        data = self._grpc_connection.data_to_send()
-        if data:
-            async with self._write_fifo_lock:
-                await self._socket.send_all(data)
+        await self._flush_event.set()
 
     async def recv(self, buffer_size: int):
         """This may only be called from single thread."""
@@ -148,17 +171,29 @@ class GRPCStream:
 
 # TODO: this name is not correct, should be something like GRPCConnection (but this name is already
 # occupied)
-class GRPCSocket:
+class GRPCSocket(async_exit_stack.AsyncExitStack):
     StreamClass = GRPCStream
 
     def __init__(self, config: GRPCConfiguration, sock,
                  receive_buffer_size=16384):
+        super().__init__()
         self._grpc_connection = GRPCConnection(config=config)
         self._socket = SocketWrapper(self._grpc_connection, sock)
         self._receive_buffer_size = receive_buffer_size
 
         self._streams = {}  # type: Dict[int, GRPCStream]
         self._streams_count = {}  # type: Dict[int, int]
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        self._socket = await self.enter_async_context(self._socket)
+        self._grpc_connection.initiate_connection()
+        await self._socket.flush()
+        if self.client_side:
+            task_group = await self.enter_async_context(anyio.create_task_group())
+            self.push_async_callback(task_group.cancel_scope.cancel)
+            await task_group.spawn(self._reader_thread)
+        return self
 
     @property
     def client_side(self):
@@ -206,15 +241,9 @@ class GRPCSocket:
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._decref_stream(event.stream_id)
 
-    async def _listener_thread(self):
+    async def _reader_thread(self):
         async for _ in self._listen():
             raise ProtocolError("Received request on client end")
-
-    async def initiate_connection(self, parent_task_group: anyio.abc.TaskGroup):
-        self._grpc_connection.initiate_connection()
-        await self._socket.flush()
-        if self.client_side:
-            await parent_task_group.spawn(self._listener_thread)
 
     @async_generator
     async def listen(self):
