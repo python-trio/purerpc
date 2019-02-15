@@ -64,7 +64,7 @@ def main():
         install_requires=[
             "h2>=3.1.0,<4",
             "protobuf~=3.6",
-            "anyio>=1.0.0b1,<2",
+            "anyio>=1.0.0b2,<2",
             "async_exit_stack>=1.0.1,<2",
             "tblib>=1.3.2,<2",
             "async_generator>=1.10,<2.0",
@@ -76,8 +76,11 @@ def main():
         setup_requires=["pytest-runner"],
         tests_require=[
             "pytest",
+            "grpcio",
             "grpcio_tools",
-            "grpcio"
+            "uvloop",
+            "trio>=0.11",
+            "curio>=0.9",
         ]
     )
 

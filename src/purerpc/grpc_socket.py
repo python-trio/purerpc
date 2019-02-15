@@ -17,24 +17,24 @@ from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
 
 class SocketWrapper:
     def __init__(self, grpc_connection: GRPCConnection, sock: anyio._networking.SocketStream):
-        self._set_raw_socket_options(sock._socket._raw_socket)
-        self._socket = sock._socket
+        self._set_socket_options(sock._socket._raw_socket)
+        self._socket = sock
         self._grpc_connection = grpc_connection
         self._write_fifo_lock = anyio.create_lock()
         self._retry = False
 
     @staticmethod
-    def _set_raw_socket_options(raw_socket):
-        raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    def _set_socket_options(sock):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         if hasattr(socket, "TCP_KEEPIDLE"):
-            raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
         elif is_darwin():
             # Darwin specific option
             TCP_KEEPALIVE = 16
-            raw_socket.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
-        raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
-        raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
-        raw_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     async def flush(self):
         """This maybe called from different threads."""
@@ -45,7 +45,7 @@ class SocketWrapper:
                 data = self._grpc_connection.data_to_send()
                 if not data:
                     return
-                await self._socket.sendall(data)
+                await self._socket.send_all(data)
 
     async def try_flush(self):
         if self.locked:
@@ -59,7 +59,7 @@ class SocketWrapper:
 
     async def recv(self, buffer_size: int):
         """This may only be called from single thread."""
-        return await self._socket.recv(buffer_size)
+        return await self._socket.receive_some(buffer_size)
 
 
 class GRPCStream:
