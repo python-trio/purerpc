@@ -1,3 +1,4 @@
+import urllib.parse
 import logging
 import datetime
 
@@ -52,15 +53,14 @@ class GRPCConnection:
     MAX_HEADER_LIST_SIZE = 8192
     MAX_CONCURRENT_STREAMS = 2 ** 16
     MAX_INBOUND_FRAME_SIZE = 2 ** 24 - 1
-    MAX_CONCURRENT_STREAMS = 1000
 
     def __init__(self, config: GRPCConfiguration):
         self.config = config
         self.h2_connection = h2.connection.H2Connection(config._h2_config)
-        self._monkey_patch_h2_connection()
+        self._set_h2_connection_local_settings()
         self.message_read_buffers = {}
 
-    def _monkey_patch_h2_connection(self):
+    def _set_h2_connection_local_settings(self):
         self.h2_connection.local_settings = h2.settings.Settings(
             client=self.config.client_side,
             initial_values={
@@ -276,8 +276,7 @@ class GRPCConnection:
             ("grpc-status", str(status.int_value)),
         ]
         if status.status_message:
-            # TODO: should be percent encoded
-            trailers.append(("grpc-message", status.status_message))
+            trailers.append(("grpc-message", urllib.parse.quote(status.status_message, safe='')))
         trailers.extend(sanitize_headers(custom_metadata))
         self.h2_connection.send_headers(stream_id, trailers, end_stream=True)
 
@@ -286,7 +285,6 @@ class GRPCConnection:
             ("grpc-status", str(status.int_value)),
         ]
         if status.status_message:
-            # TODO: should be percent encoded
-            trailers.append(("grpc-message", status.status_message))
+            trailers.append(("grpc-message", urllib.parse.quote(status.status_message, safe='')))
         trailers.extend(sanitize_headers(custom_metadata))
         self.h2_connection.send_headers(stream_id, trailers, end_stream=True)

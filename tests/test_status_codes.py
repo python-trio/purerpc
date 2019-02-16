@@ -1,6 +1,7 @@
 import functools
 import pickle
 import base64
+import string
 import re
 
 import pytest
@@ -11,15 +12,16 @@ from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_
 
 
 def regex_and(first, second):
-    return re.compile(r"(?=.*{first})(?=.*{second}).*".format(first=first, second=second), flags=re.DOTALL)
+    return re.compile(r"(?=.*{first})(?=.*{second}).*".format(first=re.escape(first), second=re.escape(second)),
+                      flags=re.DOTALL)
 
 
 STATUS_CODES = [
-    (purerpc.CancelledError, "CANCELLED", "detailed message"),
-    (purerpc.UnknownError, "UNKNOWN", "detailed message"),
-    (purerpc.InvalidArgumentError, "INVALID_ARGUMENT", "detailed message"),
-    (purerpc.DeadlineExceededError, "DEADLINE_EXCEEDED", "detailed message"),
-    (purerpc.NotFoundError, "NOT_FOUND", "detailed message"),
+    (purerpc.CancelledError, "CANCELLED", "percent encoded message: %"),
+    (purerpc.UnknownError, "UNKNOWN", "привет"),
+    (purerpc.InvalidArgumentError, "INVALID_ARGUMENT", "\r\n"),
+    (purerpc.DeadlineExceededError, "DEADLINE_EXCEEDED", string.printable),
+    (purerpc.NotFoundError, "NOT_FOUND", "message:" + string.whitespace),
     (purerpc.AlreadyExistsError, "ALREADY_EXISTS", "detailed message"),
     (purerpc.PermissionDeniedError, "PERMISSION_DENIED", "detailed message"),
     (purerpc.ResourceExhaustedError, "RESOURCE_EXHAUSTED", "detailed message"),

@@ -1,3 +1,4 @@
+import urllib.parse
 import datetime
 
 from .headers import HeaderDict
@@ -174,8 +175,7 @@ class ResponseEnded(Event):
 
         status_code = int(headers.pop("grpc-status"))
         if "grpc-message" in headers:
-            # TODO: is percent encoded
-            status_message = headers.pop("grpc-message")
+            status_message = urllib.parse.unquote(headers.pop("grpc-message"))
         else:
             status_message = ""
 
