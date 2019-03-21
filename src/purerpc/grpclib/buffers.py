@@ -10,7 +10,7 @@ class ByteBuffer:
         self._flow_controlled_length = 0
 
     def append(self, data, flow_controlled_length=None):
-        if not isinstance(data, bytes):
+        if not isinstance(data, bytes) and not isinstance(data, bytearray):
             raise ValueError("Expected bytes")
         if flow_controlled_length is None:
             flow_controlled_length = len(data)

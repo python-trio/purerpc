@@ -8,3 +8,4 @@ from purerpc.server import Service, Servicer, Server
 from purerpc.rpc import Cardinality, RPCSignature, Stream
 from purerpc.grpclib.status import Status, StatusCode
 from purerpc.grpclib.exceptions import *
+from purerpc._version import __version__

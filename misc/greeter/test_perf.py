@@ -1,58 +1,40 @@
 import time
-import curio
+import cProfile
+import anyio
+import sys
 import argparse
 import contextlib
 import multiprocessing
 
 import purerpc
+from async_generator import async_generator, yield_
 from generated.greeter_pb2 import HelloRequest, HelloReply
 from generated.greeter_grpc import GreeterServicer, GreeterStub
 
-
-@contextlib.contextmanager
-def run_purerpc_service_in_process(service):
-    queue = multiprocessing.Queue()
-    def target_fn():
-        server = purerpc.Server(port=0)
-        server.add_service(service)
-        socket = server._create_socket_and_listen()
-        queue.put(socket.getsockname()[1])
-        queue.close()
-        queue.join_thread()
-        curio.run(server._run_async_server, socket)
-
-    process = multiprocessing.Process(target=target_fn)
-    process.start()
-    port = queue.get()
-    queue.close()
-    queue.join_thread()
-    try:
-        yield port
-    finally:
-        process.terminate()
-        process.join()
+from purerpc.test_utils import run_purerpc_service_in_process
 
 
 class Greeter(GreeterServicer):
     async def SayHello(self, message):
         return HelloReply(message=message.name)
 
+    @async_generator
     async def SayHelloToMany(self, input_messages):
         async for message in input_messages:
-            yield HelloReply(message=message.name)
+            await yield_(HelloReply(message=message.name))
 
 
-async def do_load_unary(stub, num_requests, message_size):
+async def do_load_unary(result_queue, stub, num_requests, message_size):
     message = "0" * message_size
     start = time.time()
     for _ in range(num_requests):
         result = (await stub.SayHello(HelloRequest(name=message))).message
         assert (len(result) == message_size)
     avg_latency = (time.time() - start) / num_requests
-    return avg_latency
+    await result_queue.put(avg_latency)
 
 
-async def do_load_stream(stub, num_requests, message_size):
+async def do_load_stream(result_queue, stub, num_requests, message_size):
     message = "0" * message_size
     stream = await stub.SayHelloToMany()
     start = time.time()
@@ -63,7 +45,7 @@ async def do_load_stream(stub, num_requests, message_size):
     avg_latency = (time.time() - start) / num_requests
     await stream.close()
     await stream.receive_message()
-    return avg_latency
+    await result_queue.put(avg_latency)
 
 
 async def worker(port, queue, num_concurrent_streams, num_requests_per_stream,
@@ -77,16 +59,18 @@ async def worker(port, queue, num_concurrent_streams, num_requests_per_stream,
         else:
             raise ValueError(f"Unknown load type: {load_type}")
         for _ in range(num_rounds):
-            tasks = []
             start = time.time()
-            async with curio.TaskGroup() as task_group:
+            task_results = anyio.create_queue(sys.maxsize)
+            async with anyio.create_task_group() as task_group:
                 for _ in range(num_concurrent_streams):
-                    task = await task_group.spawn(load_fn(stub, num_requests_per_stream, message_size))
-                    tasks.append(task)
+                    await task_group.spawn(load_fn, task_results, stub, num_requests_per_stream, message_size)
             end = time.time()
             rps = num_concurrent_streams * num_requests_per_stream / (end - start)
             queue.put(rps)
-            queue.put([task.result for task in tasks])
+            results = []
+            for _ in range(num_concurrent_streams):
+                results.append(await task_results.get())
+            queue.put(results)
         queue.close()
         queue.join_thread()
 
@@ -107,9 +91,9 @@ if __name__ == "__main__":
     with run_purerpc_service_in_process(Greeter().service) as port:
         def target_fn(worker_id):
             queue = queues[worker_id]
-            curio.run(worker, port, queue, args.num_concurrent_streams,
-                     args.num_requests_per_stream, args.num_rounds, args.message_size,
-                     args.load_type)
+            anyio.run(worker, port, queue, args.num_concurrent_streams,
+                      args.num_requests_per_stream, args.num_rounds, args.message_size,
+                      args.load_type)
 
         processes = []
         for worker_id in range(args.num_workers):

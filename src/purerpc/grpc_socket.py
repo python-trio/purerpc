@@ -198,7 +198,7 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
     StreamClass = GRPCStream
 
     def __init__(self, config: GRPCConfiguration, sock,
-                 receive_buffer_size=16384):
+                 receive_buffer_size=1024*1024):
         super().__init__()
         self._grpc_connection = GRPCConnection(config=config)
         self._socket = SocketWrapper(self._grpc_connection, sock)
@@ -236,7 +236,6 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
             events = self._grpc_connection.receive_data(data)
             await self._socket.flush()
             for event in events:
-                # TODO: implement this
                 if isinstance(event, h2.events.WindowUpdated):
                     if event.stream_id == 0:
                         for stream in self._streams.values():

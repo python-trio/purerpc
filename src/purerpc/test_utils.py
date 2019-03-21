@@ -120,14 +120,25 @@ def run_purerpc_service_in_process(service):
         server.add_service(service)
         socket = server._create_socket_and_listen()
         yield socket.getsockname()[1]
+
+        async def sleep_10_seconds_then_die():
+            await anyio.sleep(20)
+            raise ValueError
+
+        async def main():
+            async with anyio.create_task_group() as tg:
+                await tg.spawn(server._run_async_server, socket)
+                await tg.spawn(sleep_10_seconds_then_die)
+        # import cProfile
         anyio.run(server._run_async_server, socket)
+        # cProfile.runctx("anyio.run(main)", globals(), locals(), sort="tottime")
     return _run_context_manager_generator_in_process(target_fn)
 
 
 def run_grpc_service_in_process(add_handler_fn):
     def target_fn():
         import grpc
-        server = grpc.server(concurrent.futures.ThreadPoolExecutor(max_workers=8))
+        server = grpc.server(concurrent.futures.ThreadPoolExecutor(max_workers=1))
         port = server.add_insecure_port('[::]:0')
         add_handler_fn(server)
         server.start()

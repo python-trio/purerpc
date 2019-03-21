@@ -90,7 +90,7 @@ def main():
     from purerpc.grpclib.buffers import ByteBuffer
     b = b"\x00" * 50
     x = ByteBuffer()
-    for i in range(5000000):
+    for i in range(500000):
         for j in range(50):
             x.append(b)
         x.popleft(2000)

@@ -7,7 +7,7 @@ import purerpc
 GreeterServicer = greeter_grpc.GreeterServicer
 class Servicer(GreeterServicer):
     async def SayHello(self, message):
-        return greeter_pb2.HelloReply(message="Hello, " + message.name)
+        return greeter_pb2.HelloReply(message=message.name)
 
     @async_generator
     async def SayHelloGoodbye(self, message):
@@ -15,11 +15,9 @@ class Servicer(GreeterServicer):
         await yield_(greeter_pb2.HelloReply(message=message.name))
 
     async def SayHelloToManyAtOnce(self, messages):
-        print("Got SayHelloToManyAtOnce")
         names = []
         async for message in messages:
             names.append(message.name)
-        print("Returning from SayHelloToManyAtOnce")
         return greeter_pb2.HelloReply(message="".join(names))
 
     @async_generator

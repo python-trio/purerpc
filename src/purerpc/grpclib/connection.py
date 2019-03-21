@@ -2,6 +2,8 @@ import urllib.parse
 import logging
 import datetime
 
+import ngh2
+
 import h2.stream
 import h2.errors
 import h2.events
@@ -15,38 +17,11 @@ from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded
 from .exceptions import ProtocolError
 from .buffers import MessageReadBuffer, MessageWriteBuffer
+from ._h2_monkeypatch import apply_patch
+
+apply_patch()
 
 logger = logging.getLogger(__name__)
-
-
-def monkey_patch_h2_reset_on_closed_stream_bug():
-    """
-    H2 raises h2.exceptions.StreamClosedError when receiving RST_STREAM on a closed stream that was
-    not closed by endpoint, for example:
-    
-    -> HEADERS frame
-    -> DATA frame with END_STREAM flag set  # stream is now half-closed (local)
-    <- HEADERS frame
-    <- DATA frame
-    <- HEADERS frame with END_STREAM flag set  # stream is now closed
-    <- RST_STREAM
-
-    This is the case when calling unary-unary requests with purerpc client and grpcio server
-    (it sends END_STREAM + RST_STREAM because the RPC call is unary-unary and it cannot receive
-    any more data).
-
-    To fix this, we use a workaround.
-    """
-    h2.stream._transitions[h2.stream.StreamState.CLOSED,
-                           h2.stream.StreamInputs.RECV_RST_STREAM] = \
-        (None, h2.stream.StreamState.CLOSED)
-
-    h2.stream._transitions[h2.stream.StreamState.CLOSED,
-                           h2.stream.StreamInputs.RECV_WINDOW_UPDATE] = \
-        (None, h2.stream.StreamState.CLOSED)
-
-
-monkey_patch_h2_reset_on_closed_stream_bug()
 
 
 class GRPCConnection:
@@ -57,6 +32,7 @@ class GRPCConnection:
     def __init__(self, config: GRPCConfiguration):
         self.config = config
         self.h2_connection = h2.connection.H2Connection(config._h2_config)
+        self.h2_connection.clear_outbound_data_buffer()
         self._set_h2_connection_local_settings()
         self.message_read_buffers = {}
 
@@ -70,7 +46,10 @@ class GRPCConnection:
                 SettingCodes.MAX_HEADER_LIST_SIZE: self.MAX_HEADER_LIST_SIZE,
             }
         )
-        self.h2_connection.max_inbound_frame_size = self.MAX_INBOUND_FRAME_SIZE
+        try:
+            self.h2_connection.max_inbound_frame_size = self.MAX_INBOUND_FRAME_SIZE
+        except AttributeError:
+            pass
 
     def _request_received(self, event: h2.events.RequestReceived):
         if event.stream_ended:
@@ -143,7 +122,6 @@ class GRPCConnection:
         return []
 
     def _settings_acknowledged(self, event: h2.events.SettingsAcknowledged):
-        # TODO: implement this
         return []
 
     def _priority_updated(self, event: h2.events.PriorityUpdated):
