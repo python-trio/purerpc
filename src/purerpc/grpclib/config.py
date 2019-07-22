@@ -1,7 +1,7 @@
 class GRPCConfiguration:
     def __init__(self, client_side: bool, server_string=None, user_agent=None,
                  message_encoding=None, message_accept_encoding=None,
-                 max_message_length=4194304):
+                 max_message_length=33554432):
         self._client_side = client_side
         if client_side and server_string is not None:
             raise ValueError("Passed client_side=True and server_string at the same time")
