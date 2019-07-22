@@ -1,3 +1,21 @@
+# [Release 0.4.0](https://github.com/standy66/purerpc/compare/v0.3.2...v0.4.0) (2019-07-22)
+
+
+### Bug Fixes
+
+* speed improvements ([1cb3d46](https://github.com/standy66/purerpc/commit/1cb3d46))
+
+
+### Features
+
+* add state property to GRPCStream ([0019d8c](https://github.com/standy66/purerpc/commit/0019d8c))
+* answer PING frames ([c829901](https://github.com/standy66/purerpc/commit/c829901))
+* change MAX_CONCURRENT_STREAMS from 1000 to 65536 ([d2d461f](https://github.com/standy66/purerpc/commit/d2d461f))
+* decouple h2 and grpclib logic ([1f4e6b0](https://github.com/standy66/purerpc/commit/1f4e6b0))
+* support percent-encoded grpc-message header ([c6636f4](https://github.com/standy66/purerpc/commit/c6636f4))
+* change default max message length to 32 MB
+
+
 # [Release 0.3.2](https://github.com/standy66/purerpc/compare/v0.3.1...v0.3.2) (2019-02-15)
 
 
