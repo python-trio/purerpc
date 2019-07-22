@@ -6,15 +6,13 @@ import datetime
 import anyio
 import async_exit_stack
 from async_generator import async_generator, yield_, yield_from_
-import h2
-import h2.events
-import h2.exceptions
 from purerpc.utils import is_darwin
 from purerpc.grpclib.exceptions import ProtocolError
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
-from .grpclib.events import RequestReceived, RequestEnded, ResponseEnded, MessageReceived
+from .grpclib.events import RequestReceived, RequestEnded, ResponseEnded, MessageReceived, WindowUpdated
 from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
+from .grpclib.exceptions import StreamClosedError
 
 
 class SocketWrapper(async_exit_stack.AsyncExitStack):
@@ -174,7 +172,7 @@ class GRPCStream:
         if self.client_side:
             try:
                 self._grpc_connection.end_request(self._stream_id)
-            except h2.exceptions.StreamClosedError:
+            except StreamClosedError:
                 # Remote end already closed connection, do nothing here
                 pass
         elif self._response_started:
@@ -236,7 +234,7 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
             events = self._grpc_connection.receive_data(data)
             await self._socket.flush()
             for event in events:
-                if isinstance(event, h2.events.WindowUpdated):
+                if isinstance(event, WindowUpdated):
                     if event.stream_id == 0:
                         for stream in self._streams.values():
                             await stream._set_flow_control_update()

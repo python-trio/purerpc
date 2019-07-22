@@ -10,6 +10,18 @@ class Event:
     pass
 
 
+class WindowUpdated(Event):
+    def __init__(self, stream_id, delta):
+        self.stream_id = stream_id
+        self.delta = delta
+
+    def __repr__(self):
+        return "<WindowUpdated stream_id:%s, delta:%s>" % (
+            self.stream_id, self.delta
+        )
+
+
+
 class RequestReceived(Event):
     def __init__(self, stream_id: int, scheme: str, service_name: str, method_name: str,
                  content_type: str):

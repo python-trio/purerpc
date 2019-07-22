@@ -2,20 +2,18 @@ import urllib.parse
 import logging
 import datetime
 
-import ngh2
-
-import h2.stream
-import h2.errors
+import h2.config
 import h2.events
 import h2.connection
 import h2.exceptions
 from h2.settings import SettingCodes
+from h2.errors import ErrorCodes
 
 from .headers import HeaderDict, sanitize_headers
 from .status import Status
 from .config import GRPCConfiguration
-from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded
-from .exceptions import ProtocolError
+from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded, WindowUpdated
+from .exceptions import ProtocolError, StreamClosedError
 from .buffers import MessageReadBuffer, MessageWriteBuffer
 from ._h2_monkeypatch import apply_patch
 
@@ -31,7 +29,8 @@ class GRPCConnection:
 
     def __init__(self, config: GRPCConfiguration):
         self.config = config
-        self.h2_connection = h2.connection.H2Connection(config._h2_config)
+        self.h2_connection = h2.connection.H2Connection(h2.config.H2Configuration(client_side=config.client_side,
+                                                                                  header_encoding="utf-8"))
         self.h2_connection.clear_outbound_data_buffer()
         self._set_h2_connection_local_settings()
         self.message_read_buffers = {}
@@ -88,7 +87,7 @@ class GRPCConnection:
             self.message_read_buffers[event.stream_id].data_received(event.data,
                                                                      event.flow_controlled_length)
         except KeyError:
-            self.h2_connection.reset_stream(event.stream_id, h2.errors.ErrorCodes.PROTOCOL_ERROR)
+            self.h2_connection.reset_stream(event.stream_id, ErrorCodes.PROTOCOL_ERROR)
 
         iterator = (self.message_read_buffers[event.stream_id]
                     .read_all_complete_messages_flowcontrol())
@@ -98,13 +97,10 @@ class GRPCConnection:
         return events
 
     def _window_updated(self, event: h2.events.WindowUpdated):
-        return [event]
+        return [WindowUpdated(stream_id=event.stream_id, delta=event.delta)]
 
     def _remote_settings_changed(self, event: h2.events.RemoteSettingsChanged):
-        fake_event = h2.events.WindowUpdated()
-        fake_event.stream_id = 0
-        fake_event.delta = 1
-        return [fake_event]
+        return [WindowUpdated(stream_id=0, delta=1)]
 
     def _ping_acknowledged(self, event: h2.events.PingAcknowledged):
         return []
@@ -232,7 +228,10 @@ class GRPCConnection:
         self.h2_connection.send_headers(stream_id, headers, end_stream=False)
 
     def end_request(self, stream_id: int):
-        self.h2_connection.send_data(stream_id, b"", end_stream=True)
+        try:
+            self.h2_connection.send_data(stream_id, b"", end_stream=True)
+        except h2.exceptions.StreamClosedError as e:
+            raise StreamClosedError(stream_id=e.stream_id, error_code=e.error_code)
 
     def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
         headers = [

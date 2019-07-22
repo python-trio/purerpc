@@ -1,11 +1,8 @@
-import h2.config
-
-
 class GRPCConfiguration:
     def __init__(self, client_side: bool, server_string=None, user_agent=None,
                  message_encoding=None, message_accept_encoding=None,
                  max_message_length=4194304):
-        self._h2_config = h2.config.H2Configuration(client_side=client_side, header_encoding="utf-8")
+        self._client_side = client_side
         if client_side and server_string is not None:
             raise ValueError("Passed client_side=True and server_string at the same time")
         if not client_side and user_agent is not None:
@@ -24,7 +21,7 @@ class GRPCConfiguration:
 
     @property
     def client_side(self):
-        return self._h2_config.client_side
+        return self._client_side
 
     @property
     def server_string(self):

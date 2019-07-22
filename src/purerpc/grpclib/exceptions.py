@@ -5,6 +5,12 @@ class GRPCError(Exception):
     pass
 
 
+class StreamClosedError(GRPCError):
+    def __init__(self, stream_id, error_code):
+        self.stream_id = stream_id
+        self.error_code = error_code
+
+
 class ProtocolError(GRPCError):
     pass
 
