@@ -1,3 +1,12 @@
+# [Release 0.4.1](https://github.com/standy66/purerpc/compare/v0.4.0...v0.4.1) (2019-07-22)
+
+
+### Features
+
+* remove undocumented use of raw_socket in anyio ([6de2c9a](https://github.com/standy66/purerpc/commit/6de2c9a))
+
+
+
 # [Release 0.4.0](https://github.com/standy66/purerpc/compare/v0.3.2...v0.4.0) (2019-07-22)
 
 
