@@ -1,6 +1,10 @@
 import re
 import os
-from setuptools import setup, find_packages
+import sys
+import subprocess
+from multiprocessing import cpu_count
+from setuptools import setup, find_packages, Extension
+from setuptools.command.build_ext import build_ext
 
 exec(open("src/purerpc/_version.py", encoding="utf-8").read())
 
@@ -8,6 +12,63 @@ exec(open("src/purerpc/_version.py", encoding="utf-8").read())
 def read(*names, **kwargs):
     with open(os.path.join(os.path.dirname(__file__), *names), "r") as fin:
         return fin.read()
+
+
+class CMakeExtension(Extension):
+    def __init__(self, name, cmake_target=None, sourcedir=''):
+        super().__init__(name, sources=[])
+        self.sourcedir = os.path.abspath(sourcedir)
+        self.cmake_target = cmake_target
+
+
+class CMakeBuild(build_ext):
+    def run(self):
+        self._cmake_cache_paths = set()
+        try:
+            subprocess.check_output(['cmake', '--version'])
+        except OSError:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: " +
+                ", ".join(e.name for e in self.extensions))
+        super().run()
+
+    def build_extension(self, ext):
+        if isinstance(ext, CMakeExtension):
+            extdir = os.path.abspath(
+                os.path.dirname(self.get_ext_fullpath(ext.name)))
+            cmake_args = [
+                '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
+                '-DPYTHON_EXECUTABLE=' + sys.executable,
+                '-DLIBDECODER_USE_TIMSORT=OFF',
+                ]
+            debug = self.debug or (os.getenv("DEBUG") is not None)
+            if debug:
+                print("WARNING: building in Debug mode, this may affect performance")
+            else:
+                print("Building in Release mode")
+            cfg = 'AddressSanitize' if debug else 'Release'
+            build_args = ['--config', cfg]
+            if ext.cmake_target is not None:
+                build_args += ['--target', ext.cmake_target]
+
+            cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
+            build_args += ['--', '-j' + str(cpu_count())]
+
+            env = os.environ.copy()
+            env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(
+                env.get('CXXFLAGS', ''),
+                self.distribution.get_version())
+            if not os.path.exists(self.build_temp):
+                os.makedirs(self.build_temp)
+            if ext.sourcedir not in self._cmake_cache_paths:
+                subprocess.check_call(['cmake', ext.sourcedir] + cmake_args,
+                                      cwd=self.build_temp, env=env)
+                self._cmake_cache_paths.add(ext.sourcedir)
+            subprocess.check_call(['cmake', '--build', '.'] + build_args,
+                                  cwd=self.build_temp)
+            print()  # Add an empty line for cleaner output
+        else:
+            super().build_extension(ext)
 
 
 def main():
@@ -59,6 +120,10 @@ def main():
         ],
         packages=find_packages('src'),
         package_dir={'': 'src'},
+        ext_modules=[
+            CMakeExtension("purerpc.grpclib._grpclib_bindings", cmake_target="_grpclib_bindings"),
+        ],
+        cmdclass=dict(build_ext=CMakeBuild),
         test_suite="tests",
         python_requires=">=3.5",
         install_requires=[

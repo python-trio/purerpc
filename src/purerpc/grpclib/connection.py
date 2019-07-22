@@ -2,12 +2,14 @@ import urllib.parse
 import logging
 import datetime
 
-import h2.config
-import h2.events
-import h2.connection
-import h2.exceptions
-from h2.settings import SettingCodes
-from h2.errors import ErrorCodes
+# import h2.errors
+# import h2.config
+# import h2.events
+# import h2.connection
+# import h2.exceptions
+# from h2.settings import SettingCodes
+
+from . import _grpclib_bindings as bindings
 
 from .headers import HeaderDict, sanitize_headers
 from .status import Status
@@ -15,9 +17,9 @@ from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded, WindowUpdated
 from .exceptions import ProtocolError, StreamClosedError
 from .buffers import MessageReadBuffer, MessageWriteBuffer
-from ._h2_monkeypatch import apply_patch
+# from ._h2_monkeypatch import apply_patch
 
-apply_patch()
+# apply_patch()
 
 logger = logging.getLogger(__name__)
 
@@ -29,28 +31,27 @@ class GRPCConnection:
 
     def __init__(self, config: GRPCConfiguration):
         self.config = config
-        self.h2_connection = h2.connection.H2Connection(h2.config.H2Configuration(client_side=config.client_side,
-                                                                                  header_encoding="utf-8"))
+        self.h2_connection = bindings.H2Connection(client_side=config.client_side)
         self.h2_connection.clear_outbound_data_buffer()
-        self._set_h2_connection_local_settings()
+        # self._set_h2_connection_local_settings()
         self.message_read_buffers = {}
 
-    def _set_h2_connection_local_settings(self):
-        self.h2_connection.local_settings = h2.settings.Settings(
-            client=self.config.client_side,
-            initial_values={
-                SettingCodes.MAX_CONCURRENT_STREAMS: self.MAX_CONCURRENT_STREAMS,
-                SettingCodes.INITIAL_WINDOW_SIZE: 2 * self.config.max_message_length,
-                SettingCodes.MAX_FRAME_SIZE: self.MAX_INBOUND_FRAME_SIZE,
-                SettingCodes.MAX_HEADER_LIST_SIZE: self.MAX_HEADER_LIST_SIZE,
-            }
-        )
-        try:
-            self.h2_connection.max_inbound_frame_size = self.MAX_INBOUND_FRAME_SIZE
-        except AttributeError:
-            pass
+    # def _set_h2_connection_local_settings(self):
+        # self.h2_connection.local_settings = h2.settings.Settings(
+        #     client=self.config.client_side,
+        #     initial_values={
+        #         SettingCodes.MAX_CONCURRENT_STREAMS: self.MAX_CONCURRENT_STREAMS,
+        #         SettingCodes.INITIAL_WINDOW_SIZE: 2 * self.config.max_message_length,
+        #         SettingCodes.MAX_FRAME_SIZE: self.MAX_INBOUND_FRAME_SIZE,
+        #         SettingCodes.MAX_HEADER_LIST_SIZE: self.MAX_HEADER_LIST_SIZE,
+        #     }
+        # )
+        # try:
+        #     self.h2_connection.max_inbound_frame_size = self.MAX_INBOUND_FRAME_SIZE
+        # except AttributeError:
+        #     pass
 
-    def _request_received(self, event: h2.events.RequestReceived):
+    def _request_received(self, event: bindings.RequestReceived):
         if event.stream_ended:
             raise ProtocolError("Stream ended before data was sent")
         request = RequestReceived.parse_from_stream_id_and_headers_destructive(
@@ -59,7 +60,7 @@ class GRPCConnection:
             self.config.max_message_length)
         return [request]
 
-    def _response_received(self, event: h2.events.ResponseReceived):
+    def _response_received(self, event: bindings.ResponseReceived):
         headers = HeaderDict(event.headers)
         response_received = ResponseReceived.parse_from_stream_id_and_headers_destructive(
             event.stream_id, headers)
@@ -74,20 +75,20 @@ class GRPCConnection:
                 response_received.message_encoding, self.config.max_message_length)
             return [response_received]
 
-    def _trailers_received(self, event: h2.events.TrailersReceived):
+    def _trailers_received(self, event: bindings.TrailersReceived):
         response_ended = ResponseEnded.parse_from_stream_id_and_headers_destructive(
             event.stream_id, HeaderDict(event.headers))
         return [response_ended]
 
-    def _informational_response_received(self, event: h2.events.InformationalResponseReceived):
-        return []
+    # def _informational_response_received(self, event: bindings.InformationalResponseReceived):
+    #     return []
 
-    def _data_received(self, event: h2.events.DataReceived):
+    def _data_received(self, event: bindings.DataReceived):
         try:
             self.message_read_buffers[event.stream_id].data_received(event.data,
                                                                      event.flow_controlled_length)
         except KeyError:
-            self.h2_connection.reset_stream(event.stream_id, ErrorCodes.PROTOCOL_ERROR)
+            self.h2_connection.reset_stream(event.stream_id, bindings.ErrorCodes.PROTOCOL_ERROR)
 
         iterator = (self.message_read_buffers[event.stream_id]
                     .read_all_complete_messages_flowcontrol())
@@ -96,45 +97,51 @@ class GRPCConnection:
             events.append(MessageReceived(event.stream_id, message, flow_controlled_length))
         return events
 
-    def _window_updated(self, event: h2.events.WindowUpdated):
+    def _window_updated(self, event: bindings.WindowUpdated):
         return [WindowUpdated(stream_id=event.stream_id, delta=event.delta)]
 
-    def _remote_settings_changed(self, event: h2.events.RemoteSettingsChanged):
+    def _remote_settings_changed(self, event: bindings.RemoteSettingsChanged):
         return [WindowUpdated(stream_id=0, delta=1)]
 
-    def _ping_acknowledged(self, event: h2.events.PingAcknowledged):
+    def _ping_acknowledged(self, event: bindings.PingAckReceived):
         return []
 
-    def _stream_ended(self, event: h2.events.StreamEnded):
+    def _stream_ended(self, event: bindings.StreamEnded):
         if event.stream_id in self.message_read_buffers:
             del self.message_read_buffers[event.stream_id]
             return [RequestEnded(event.stream_id)] if not self.config.client_side else []
         return []
 
-    def _stream_reset(self, event: h2.events.StreamReset):
+    def _stream_reset(self, event: bindings.StreamReset):
         return []
 
-    def _push_stream_received(self, event: h2.events.PushedStreamReceived):
+    def _push_stream_received(self, event: bindings.PushedStreamReceived):
         return []
 
-    def _settings_acknowledged(self, event: h2.events.SettingsAcknowledged):
+    def _settings_acknowledged(self, event: bindings.SettingsAcknowledged):
         return []
 
-    def _priority_updated(self, event: h2.events.PriorityUpdated):
+    def _priority_updated(self, event: bindings.PriorityUpdated):
         return []
 
-    def _connection_terminated(self, event: h2.events.ConnectionTerminated):
+    def _connection_terminated(self, event: bindings.ConnectionTerminated):
         return []
 
-    def _alternative_service_available(self, event: h2.events.AlternativeServiceAvailable):
-        return []
+    # def _alternative_service_available(self, event: bindings.AlternativeServiceAvailable):
+    #     return []
 
-    def _unknown_frame_received(self, event: h2.events.UnknownFrameReceived):
+    def _unknown_frame_received(self, event: bindings.UnknownFrameReceived):
         return []
 
     def initiate_connection(self):
-        self.h2_connection.initiate_connection()
-        self.h2_connection.increment_flow_control_window(2 ** 30)
+        self.h2_connection.initiate_connection(settings_overrides=[
+            (bindings.SettingCodes.MAX_CONCURRENT_STREAMS, self.MAX_CONCURRENT_STREAMS),
+            (bindings.SettingCodes.INITIAL_WINDOW_SIZE, 2 * self.config.max_message_length),
+            (bindings.SettingCodes.MAX_FRAME_SIZE, self.MAX_INBOUND_FRAME_SIZE),
+            (bindings.SettingCodes.MAX_HEADER_LIST_SIZE, self.MAX_HEADER_LIST_SIZE),
+            (bindings.SettingCodes.INITIAL_WINDOW_SIZE, 2 ** 20),
+        ])
+        # self.h2_connection.increment_flow_control_window(2 ** 30)
 
     def data_to_send(self, amount: int = None):
         return self.h2_connection.data_to_send(amount)
@@ -143,37 +150,37 @@ class GRPCConnection:
         events = self.h2_connection.receive_data(data)
         grpc_events = []
         for event in events:
-            if isinstance(event, h2.events.RequestReceived):
+            if isinstance(event, bindings.RequestReceived):
                 grpc_events.extend(self._request_received(event))
-            elif isinstance(event, h2.events.ResponseReceived):
+            elif isinstance(event, bindings.ResponseReceived):
                 grpc_events.extend(self._response_received(event))
-            elif isinstance(event, h2.events.TrailersReceived):
+            elif isinstance(event, bindings.TrailersReceived):
                 grpc_events.extend(self._trailers_received(event))
-            elif isinstance(event, h2.events.InformationalResponseReceived):
-                grpc_events.extend(self._informational_response_received(event))
-            elif isinstance(event, h2.events.DataReceived):
+            # elif isinstance(event, bindings.InformationalResponseReceived):
+            #     grpc_events.extend(self._informational_response_received(event))
+            elif isinstance(event, bindings.DataReceived):
                 grpc_events.extend(self._data_received(event))
-            elif isinstance(event, h2.events.WindowUpdated):
+            elif isinstance(event, bindings.WindowUpdated):
                 grpc_events.extend(self._window_updated(event))
-            elif isinstance(event, h2.events.RemoteSettingsChanged):
+            elif isinstance(event, bindings.RemoteSettingsChanged):
                 grpc_events.extend(self._remote_settings_changed(event))
-            elif isinstance(event, h2.events.PingAcknowledged):
+            elif isinstance(event, bindings.PingAckReceived):
                 grpc_events.extend(self._ping_acknowledged(event))
-            elif isinstance(event, h2.events.StreamEnded):
+            elif isinstance(event, bindings.StreamEnded):
                 grpc_events.extend(self._stream_ended(event))
-            elif isinstance(event, h2.events.StreamReset):
+            elif isinstance(event, bindings.StreamReset):
                 grpc_events.extend(self._stream_reset(event))
-            elif isinstance(event, h2.events.PushedStreamReceived):
+            elif isinstance(event, bindings.PushedStreamReceived):
                 grpc_events.extend(self._push_stream_received(event))
-            elif isinstance(event, h2.events.SettingsAcknowledged):
+            elif isinstance(event, bindings.SettingsAcknowledged):
                 grpc_events.extend(self._settings_acknowledged(event))
-            elif isinstance(event, h2.events.PriorityUpdated):
+            elif isinstance(event, bindings.PriorityUpdated):
                 grpc_events.extend(self._priority_updated(event))
-            elif isinstance(event, h2.events.ConnectionTerminated):
+            elif isinstance(event, bindings.ConnectionTerminated):
                 grpc_events.extend(self._connection_terminated(event))
-            elif isinstance(event, h2.events.AlternativeServiceAvailable):
-                grpc_events.extend(self._alternative_service_available(event))
-            elif isinstance(event, h2.events.UnknownFrameReceived):
+            # elif isinstance(event, bindings.AlternativeServiceAvailable):
+            #     grpc_events.extend(self._alternative_service_available(event))
+            elif isinstance(event, bindings.UnknownFrameReceived):
                 grpc_events.extend(self._unknown_frame_received(event))
 
         return grpc_events
@@ -182,7 +189,7 @@ class GRPCConnection:
         return min(self.h2_connection.max_outbound_frame_size,
                    self.h2_connection.local_flow_control_window(stream_id))
 
-    def reset_stream(self, stream_id: int, error_code: h2.errors.ErrorCodes):
+    def reset_stream(self, stream_id: int, error_code: bindings.ErrorCodes):
         self.h2_connection.reset_stream(stream_id, error_code)
 
     def acknowledge_received_data(self, stream_id: int, flow_controlled_length: int):
@@ -230,7 +237,7 @@ class GRPCConnection:
     def end_request(self, stream_id: int):
         try:
             self.h2_connection.send_data(stream_id, b"", end_stream=True)
-        except h2.exceptions.StreamClosedError as e:
+        except bindings.StreamClosedError as e:
             raise StreamClosedError(stream_id=e.stream_id, error_code=e.error_code)
 
     def start_response(self, stream_id: int, content_type_suffix="", custom_metadata=()):
