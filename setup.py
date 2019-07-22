@@ -63,8 +63,8 @@ def main():
         python_requires=">=3.5",
         install_requires=[
             "h2>=3.1.0,<4",
-            "protobuf~=3.6",
-            "anyio>=1.0.0b2,<2",
+            "protobuf>=3.5.1,<4",
+            "anyio>=1.0.0,<2",
             "async_exit_stack>=1.0.1,<2",
             "tblib>=1.3.2,<2",
             "async_generator>=1.10,<2.0",

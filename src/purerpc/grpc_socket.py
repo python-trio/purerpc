@@ -16,9 +16,9 @@ from .grpclib.exceptions import StreamClosedError
 
 
 class SocketWrapper(async_exit_stack.AsyncExitStack):
-    def __init__(self, grpc_connection: GRPCConnection, sock: anyio._networking.SocketStream):
+    def __init__(self, grpc_connection: GRPCConnection, sock: anyio.SocketStream):
         super().__init__()
-        self._set_socket_options(sock._socket._raw_socket)
+        self._set_socket_options(sock)
         self._socket = sock
         self._grpc_connection = grpc_connection
         self._flush_event = anyio.create_event()
@@ -37,7 +37,7 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
         return self
 
     @staticmethod
-    def _set_socket_options(sock):
+    def _set_socket_options(sock: anyio.SocketStream):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         if hasattr(socket, "TCP_KEEPIDLE"):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
