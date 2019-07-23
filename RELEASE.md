@@ -1,3 +1,12 @@
+# [Release 0.5.1](https://github.com/standy66/purerpc/compare/v0.5.0...v0.5.1) (2019-07-23)
+
+
+### Bug Fixes
+
+* async generators on python 3.5 ([1c19229](https://github.com/standy66/purerpc/commit/1c19229))
+
+
+
 # [Release 0.5.0](https://github.com/standy66/purerpc/compare/v0.4.1...v0.5.0) (2019-07-23)
 
 
