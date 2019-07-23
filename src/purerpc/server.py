@@ -3,7 +3,9 @@ import inspect
 import warnings
 import socket
 import collections
+import async_generator
 import functools
+import async_exit_stack
 from multiprocessing import Process
 
 import anyio
@@ -64,6 +66,7 @@ class Service:
                                                           signature.return_annotation)
             self.add_method(method_name, func, rpc_signature, method_signature=signature)
             return func
+
         return decorator
 
 
@@ -75,7 +78,6 @@ class Servicer:
 
 def tcp_server_socket(host, port, family=socket.AF_INET, backlog=100,
                       reuse_address=True, reuse_port=False):
-
     raw_socket = socket.socket(family, socket.SOCK_STREAM)
     try:
         if reuse_address:
@@ -96,16 +98,43 @@ def tcp_server_socket(host, port, family=socket.AF_INET, backlog=100,
     return raw_socket
 
 
+@async_generator.asynccontextmanager
+async def _service_wrapper(service=None, setup_fn=None, teardown_fn=None):
+    if setup_fn is not None:
+        yield (await setup_fn())
+    else:
+        yield service
+
+    if teardown_fn is not None:
+        await teardown_fn()
+
+
 class Server:
-    def __init__(self, port=50055, num_processes=1):
+    def __init__(self, port=50055):
         self.port = port
         self.services = {}
-        self.num_processes = num_processes
-        if num_processes > 1 and (not is_linux() or get_linux_kernel_version() < (3, 9)):
-            warnings.warn("Selected num_processes > 1 and not running Linux kernel >= 3.9")
 
-    def add_service(self, service):
-        self.services[service.name] = service
+    def add_service(self, service=None, context_manager=None, setup_fn=None, teardown_fn=None, name=None):
+        if (service is not None) + (context_manager is not None) + (setup_fn is not None) != 1:
+            raise ValueError("Precisely one of service, context_manager or setup_fn should be set")
+        if name is None:
+            if hasattr(service, "name"):
+                name = service.name
+            elif hasattr(context_manager, "name"):
+                name = context_manager.name
+            elif hasattr(setup_fn, "name"):
+                name = setup_fn.name
+            else:
+                raise ValueError("Could not infer name, please provide 'name' argument to this function call "
+                                 "or define 'name' attribute on service, context_manager or setup_fn")
+        if service is not None:
+            self.services[name] = _service_wrapper(service=service)
+        elif context_manager is not None:
+            self.services[name] = context_manager
+        elif setup_fn is not None:
+            self.services[name] = _service_wrapper(setup_fn=setup_fn, teardown_fn=teardown_fn)
+        else:
+            raise ValueError("Shouldn't have happened")
 
     def _create_socket_and_listen(self):
         return tcp_server_socket('', self.port, reuse_address=True, reuse_port=True)
@@ -114,36 +143,33 @@ class Server:
         socket = anyio._get_asynclib().Socket(raw_socket)
 
         # TODO: resource usage warning
-        async with anyio._networking.SocketStreamServer(socket, None, False, False) as tcp_server, \
-                                                                anyio.create_task_group() as task_group:
+        async with async_exit_stack.AsyncExitStack() as stack:
+            tcp_server = await stack.enter_async_context(
+                anyio._networking.SocketStreamServer(socket, None, False, False))
+            task_group = await stack.enter_async_context(anyio.create_task_group())
+
+            services_dict = {}
+            for key, value in self.services.items():
+                services_dict[key] = await stack.enter_async_context(value)
+
             async for socket in tcp_server.accept_connections():
-                await task_group.spawn(ConnectionHandler(self), socket)
+                await task_group.spawn(ConnectionHandler(services_dict), socket)
 
     def _target_fn(self, backend):
         socket = self._create_socket_and_listen()
         anyio.run(self._run_async_server, socket, backend=backend)
 
     def serve(self, backend=None):
-        if self.num_processes == 1:
-            self._target_fn(backend)
-        else:
-            # this is simple SO_REUSEPORT load balancing on Linux
-            processes = []
-            for i in range(self.num_processes):
-                process = Process(target=self._target_fn, args=(backend,))
-                process.start()
-                processes.append(process)
-            for process in processes:
-                process.join()
+        self._target_fn(backend)
 
 
 class ConnectionHandler:
     RECEIVE_BUFFER_SIZE = 65536
 
-    def __init__(self, server: Server):
+    def __init__(self, services: dict):
         self.config = GRPCConfiguration(client_side=False)
         self.grpc_socket = None
-        self.server = server
+        self.services = services
 
     async def request_received(self, stream: GRPCProtoStream):
         await stream.start_response()
@@ -154,7 +180,7 @@ class ConnectionHandler:
             return
 
         try:
-            service = self.server.services[event.service_name]
+            service = self.services[event.service_name]
         except KeyError:
             await stream.close(Status(
                 StatusCode.UNIMPLEMENTED,
