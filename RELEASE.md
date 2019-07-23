@@ -1,3 +1,12 @@
+# [Release 0.5.0](https://github.com/standy66/purerpc/compare/v0.4.1...v0.5.0) (2019-07-23)
+
+
+### Features
+
+* can now pass contextmngr or setup_fn/teardown_fn to add_service ([208dd95](https://github.com/standy66/purerpc/commit/208dd95))
+
+
+
 # [Release 0.4.1](https://github.com/standy66/purerpc/compare/v0.4.0...v0.4.1) (2019-07-22)
 
 
