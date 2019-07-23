@@ -1,16 +1,13 @@
 import sys
 import inspect
-import warnings
 import socket
 import collections
-import async_generator
 import functools
 import async_exit_stack
-from multiprocessing import Process
+import logging
 
 import anyio
-import typing
-import logging
+from async_generator import async_generator, asynccontextmanager, yield_
 
 from .grpclib.events import RequestReceived
 from .grpclib.status import Status, StatusCode
@@ -98,12 +95,13 @@ def tcp_server_socket(host, port, family=socket.AF_INET, backlog=100,
     return raw_socket
 
 
-@async_generator.asynccontextmanager
+@asynccontextmanager
+@async_generator
 async def _service_wrapper(service=None, setup_fn=None, teardown_fn=None):
     if setup_fn is not None:
-        yield (await setup_fn())
+        await yield_(await setup_fn())
     else:
-        yield service
+        await yield_(service)
 
     if teardown_fn is not None:
         await teardown_fn()
