@@ -10,7 +10,7 @@ from purerpc import Cardinality
 
 def get_python_package(proto_name):
     package_name = proto_name[:-len(".proto")]
-    return package_name.replace("/", ".") + "_pb2"
+    return package_name.replace("/", ".").replace("-", "_") + "_pb2"
 
 
 def simple_type(type_):
@@ -126,6 +126,6 @@ def main():
     for proto_file in request.proto_file:
         if proto_file.name in files_to_generate:
             out = response.file.add()
-            out.name = proto_file.name.replace('.proto', "_grpc.py")
+            out.name = proto_file.name.replace('-', "_").replace('.proto', "_grpc.py")
             out.content = generate_single_proto(proto_file, proto_for_entity)
     sys.stdout.buffer.write(response.SerializeToString())
