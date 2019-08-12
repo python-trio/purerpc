@@ -1,4 +1,3 @@
-import os
 import sys
 import itertools
 
@@ -8,9 +7,17 @@ from google.protobuf import descriptor_pb2
 from purerpc import Cardinality
 
 
-def get_python_package(proto_name):
+def generate_import_statement(proto_name):
+    parts = proto_name.replace("-", "_").split("/")
+    package_name = ".".join(parts[:-1])
+    module_name = parts[-1][:-len(".proto")] + "_pb2"
+    alias = get_python_module_alias(proto_name)
+    return "from " + package_name + " import " + module_name + " as " + alias
+
+
+def get_python_module_alias(proto_name):
     package_name = proto_name[:-len(".proto")]
-    return package_name.replace("/", ".") + "_pb2"
+    return package_name.replace("/", "_dot_").replace("-", "_") + "__pb2"
 
 
 def simple_type(type_):
@@ -20,7 +27,7 @@ def simple_type(type_):
 
 def get_python_type(proto_name, proto_type):
     if proto_type.startswith("."):
-        return get_python_package(proto_name) + "." + simple_type(proto_type)
+        return get_python_module_alias(proto_name) + "." + simple_type(proto_type)
     else:
         return proto_type
 
@@ -28,9 +35,9 @@ def get_python_type(proto_name, proto_type):
 def generate_single_proto(proto_file: descriptor_pb2.FileDescriptorProto,
                           proto_for_entity):
     lines = ["import purerpc"]
-    lines.append("import " + get_python_package(proto_file.name))
+    lines.append(generate_import_statement(proto_file.name))
     for dep_module in proto_file.dependency:
-        lines.append("import " + get_python_package(dep_module))
+        lines.append(generate_import_statement(dep_module))
     for service in proto_file.service:
         if proto_file.package:
             fully_qualified_service_name = proto_file.package + "." + service.name
@@ -126,6 +133,6 @@ def main():
     for proto_file in request.proto_file:
         if proto_file.name in files_to_generate:
             out = response.file.add()
-            out.name = proto_file.name.replace('.proto', "_grpc.py")
+            out.name = proto_file.name.replace('-', "_").replace('.proto', "_grpc.py")
             out.content = generate_single_proto(proto_file, proto_for_entity)
     sys.stdout.buffer.write(response.SerializeToString())
