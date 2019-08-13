@@ -8,11 +8,9 @@ from purerpc import Cardinality
 
 
 def generate_import_statement(proto_name):
-    parts = proto_name.replace("-", "_").split("/")
-    package_name = ".".join(parts[:-1])
-    module_name = parts[-1][:-len(".proto")] + "_pb2"
+    module_path = proto_name[:-len(".proto")].replace("-", "_").replace("/", ".") + "_pb2"
     alias = get_python_module_alias(proto_name)
-    return "from " + package_name + " import " + module_name + " as " + alias
+    return "import " + module_path + " as " + alias
 
 
 def get_python_module_alias(proto_name):
