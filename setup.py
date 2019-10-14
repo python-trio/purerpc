@@ -68,7 +68,6 @@ def main():
             "async_exit_stack>=1.0.1,<2",
             "tblib>=1.3.2,<2",
             "async_generator>=1.10,<2.0",
-            "python-forge~=18.6"
         ],
         entry_points={
             "console_scripts": console_scripts,
@@ -81,6 +80,7 @@ def main():
             "uvloop",
             "trio>=0.11",
             "curio>=0.9",
+            "python-forge~=18.6",
         ]
     )
 
