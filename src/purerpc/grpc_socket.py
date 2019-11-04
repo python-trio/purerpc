@@ -45,7 +45,7 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
             # Darwin specific option
             TCP_KEEPALIVE = 16
             sock.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
-        if !is_windows():
+        if not is_windows():
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
