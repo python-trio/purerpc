@@ -148,6 +148,7 @@ class Server:
                                                      self._ssl,
                                                      self._ssl is not None, 
                                                      False)
+            )
             task_group = await stack.enter_async_context(anyio.create_task_group())
 
             services_dict = {}
