@@ -215,10 +215,12 @@ class ConnectionHandler:
             except RpcFailedError as error:
                 await stream.close(error.status)
             except:
-                logging.exception("Got exception while writing response stream")
+                log.warning("Got exception while writing response stream",
+                            exc_info=log.getEffectiveLevel() == logging.DEBUG)
                 await stream.close(Status(StatusCode.CANCELLED, status_message=repr(sys.exc_info())))
         except:
-            logging.exception("Got exception in request_received")
+            log.warning("Got exception in request_received",
+                        exc_info=log.getEffectiveLevel() == logging.DEBUG)
 
     async def __call__(self, socket):
         # TODO: Should at least pass through GeneratorExit
@@ -231,4 +233,5 @@ class ConnectionHandler:
                     async for stream in self.grpc_socket.listen():
                         await task_group.spawn(self.request_received, stream)
         except:
-            logging.exception("Got exception in main dispatch loop")
+            log.warning("Got exception in main dispatch loop",
+                        exc_info=log.getEffectiveLevel() == logging.DEBUG)
