@@ -1,4 +1,14 @@
-# [](https://github.com/standy66/purerpc/compare/v0.6.0...v) (2020-04-13)
+# [Release 0.6.1](https://github.com/standy66/purerpc/compare/v0.6.0...v0.6.1) (2020-04-13)
+
+
+### Bug Fixes
+
+* build in PyPy 3.6, remove 3.5 builds from CI ([d1bcc9d](https://github.com/standy66/purerpc/commit/d1bcc9d))
+* remove CPython 3.5 builds ([7488ba8](https://github.com/standy66/purerpc/commit/7488ba8))
+
+
+
+# [Release 0.6.0](https://github.com/standy66/purerpc/compare/v0.5.2...v0.6.0) (2020-04-13)
 
 ### Features
 
