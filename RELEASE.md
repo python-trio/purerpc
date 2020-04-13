@@ -1,3 +1,10 @@
+# [](https://github.com/standy66/purerpc/compare/v0.6.0...v) (2020-04-13)
+
+### Features
+
+* Add TLS Support
+
+
 # [Release 0.5.2](https://github.com/standy66/purerpc/compare/v0.5.1...v0.5.2) (2019-07-23)
 
 
