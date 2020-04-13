@@ -11,15 +11,19 @@ from purerpc.wrappers import ClientStubUnaryUnary, ClientStubStreamStream, Clien
 
 
 class _Channel(async_exit_stack.AsyncExitStack):
-    def __init__(self, host, port):
+    def __init__(self, host, port, ssl_context=None):
         super().__init__()
         self._host = host
         self._port = port
+        self._ssl = ssl_context
         self._grpc_socket = None
 
     async def __aenter__(self):
         await super().__aenter__()  # Does nothing
-        socket = await anyio.connect_tcp(self._host, self._port, autostart_tls=False, tls_standard_compatible=False)
+        socket = await anyio.connect_tcp(self._host, self._port,
+                                         ssl_context=self._ssl,
+                                         autostart_tls=self._ssl is not None,
+                                         tls_standard_compatible=False)
         config = GRPCConfiguration(client_side=True)
         self._grpc_socket = await self.enter_async_context(GRPCProtoSocket(config, socket))
         return self
@@ -27,6 +31,9 @@ class _Channel(async_exit_stack.AsyncExitStack):
 
 def insecure_channel(host, port):
     return _Channel(host, port)
+
+def secure_channel(host, port, ssl_context):
+    return _Channel(host, port, ssl_context)
 
 
 class Client:

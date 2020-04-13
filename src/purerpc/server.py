@@ -74,7 +74,7 @@ class Servicer:
 
 
 def tcp_server_socket(host, port, family=socket.AF_INET, backlog=100,
-                      reuse_address=True, reuse_port=False):
+                      reuse_address=True, reuse_port=False, ssl_context=None):
     raw_socket = socket.socket(family, socket.SOCK_STREAM)
     try:
         if reuse_address:
@@ -108,8 +108,9 @@ async def _service_wrapper(service=None, setup_fn=None, teardown_fn=None):
 
 
 class Server:
-    def __init__(self, port=50055):
+    def __init__(self, port=50055, ssl_context=None):
         self.port = port
+        self._ssl = ssl_context
         self.services = {}
 
     def add_service(self, service=None, context_manager=None, setup_fn=None, teardown_fn=None, name=None):
@@ -143,7 +144,11 @@ class Server:
         # TODO: resource usage warning
         async with async_exit_stack.AsyncExitStack() as stack:
             tcp_server = await stack.enter_async_context(
-                anyio._networking.SocketStreamServer(socket, None, False, False))
+                anyio._networking.SocketStreamServer(socket,
+                                                     self._ssl,
+                                                     self._ssl is not None, 
+                                                     False)
+            )
             task_group = await stack.enter_async_context(anyio.create_task_group())
 
             services_dict = {}

@@ -6,7 +6,7 @@ import datetime
 import anyio
 import async_exit_stack
 from async_generator import async_generator, yield_, yield_from_
-from purerpc.utils import is_darwin
+from purerpc.utils import is_darwin, is_windows
 from purerpc.grpclib.exceptions import ProtocolError
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
@@ -45,8 +45,9 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
             # Darwin specific option
             TCP_KEEPALIVE = 16
             sock.setsockopt(socket.IPPROTO_TCP, TCP_KEEPALIVE, 300)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
+        if not is_windows():
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     async def _writer_thread(self):
