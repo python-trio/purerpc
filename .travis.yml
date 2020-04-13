@@ -10,12 +10,7 @@ stages:
     if: tag IS present AND type != pull_request
 env:
   # We run pypy tests first because they run the slowest
-  - PYTHON_IMAGE="pypy:3.5" PURERPC_BACKEND="asyncio"
-  # - PYTHON_IMAGE="pypy:3.5" PURERPC_BACKEND="uvloop"  # uvloop is not supported on PyPy for now
-  - PYTHON_IMAGE="pypy:3.5" PURERPC_BACKEND="curio"
-  - PYTHON_IMAGE="pypy:3.5" PURERPC_BACKEND="trio"
   - PYTHON_IMAGE="pypy:3.6" PURERPC_BACKEND="asyncio"
-  # - PYTHON_IMAGE="pypy:3.6" PURERPC_BACKEND="asyncio"  # uvloop is not supported on PyPy for now
   - PYTHON_IMAGE="pypy:3.6" PURERPC_BACKEND="curio"
   - PYTHON_IMAGE="pypy:3.6" PURERPC_BACKEND="trio"
   - PYTHON_IMAGE="python:3.5" PURERPC_BACKEND="asyncio"

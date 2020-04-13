@@ -75,8 +75,8 @@ def main():
         setup_requires=["pytest-runner"],
         tests_require=[
             "pytest",
-            "grpcio",
-            "grpcio_tools",
+            "grpcio==1.25.0",           # fix version for PyPy
+            "grpcio_tools==1.25.0",     # same here
             "uvloop",
             "trio>=0.11",
             "curio>=0.9",
