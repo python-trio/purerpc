@@ -118,14 +118,21 @@ def _run_context_manager_generator_in_process(cm_gen):
             parent_conn.close()
 
 
-def run_purerpc_service_in_process(service, port=50055, ssl_context=None):
-    # port cannot be 0 since we have to yield the port number before serve()
-    # TODO: migrate to an async context manager and serve_async().
-    #  This async cm has timing problems, because the server may not
-    #  be listening before yielding to the body.
+def run_purerpc_service_in_process(service, ssl_context=None):
+    # TODO: there is no reason to run the server as a separate process...
+    #   just use serve_async().  This synchronous cm has timing problems,
+    #   because the server may not be listening before yielding to the body.
 
     def target_fn():
         import purerpc
+        import socket
+
+        # Grab an ephemeral port in advance, because we need to yield the port
+        # before blocking on serve()...
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+
         server = purerpc.Server(port=port, ssl_context=ssl_context)
         server.add_service(service)
         yield port

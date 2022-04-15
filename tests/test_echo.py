@@ -95,7 +95,6 @@ def purerpc_echo_port_ssl(echo_pb2, echo_grpc, server_ssl_context):
             await yield_(echo_pb2.EchoReply(data="".join(data)))
 
     with run_purerpc_service_in_process(Servicer().service,
-                                        port=50056,
                                         ssl_context=server_ssl_context) as port:
         # TODO: migrate to serve_async() to avoid timing problems
         import time
