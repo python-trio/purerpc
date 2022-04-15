@@ -18,10 +18,10 @@ from .grpclib.exceptions import StreamClosedError
 
 
 class SocketWrapper(async_exit_stack.AsyncExitStack):
-    def __init__(self, grpc_connection: GRPCConnection, sock: anyio.abc.SocketStream):
+    def __init__(self, grpc_connection: GRPCConnection, stream: anyio.abc.SocketStream):
         super().__init__()
-        self._set_socket_options(sock)
-        self._socket = sock
+        self._set_socket_options(stream)
+        self._stream = stream
         self._grpc_connection = grpc_connection
         self._flush_event = anyio.Event()
         self._running = True
@@ -57,7 +57,7 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
         while True:
             data = self._grpc_connection.data_to_send()
             if data:
-                await self._socket.send(data)
+                await self._stream.send(data)
             elif self._running:
                 await self._flush_event.wait()
                 self._flush_event = anyio.Event()
@@ -70,7 +70,7 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
 
     async def recv(self, buffer_size: int):
         """This may only be called from single thread."""
-        return await self._socket.receive(buffer_size)
+        return await self._stream.receive(buffer_size)
 
 
 class GRPCStreamState(enum.Enum):
