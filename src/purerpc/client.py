@@ -22,7 +22,7 @@ class _Channel(async_exit_stack.AsyncExitStack):
         await super().__aenter__()  # Does nothing
         socket = await anyio.connect_tcp(self._host, self._port,
                                          ssl_context=self._ssl,
-                                         autostart_tls=self._ssl is not None,
+                                         tls=self._ssl is not None,
                                          tls_standard_compatible=False)
         config = GRPCConfiguration(client_side=True)
         self._grpc_socket = await self.enter_async_context(GRPCProtoSocket(config, socket))

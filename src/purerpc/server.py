@@ -1,12 +1,14 @@
 import sys
 import inspect
-import socket
 import collections
 import functools
+
 import async_exit_stack
 import logging
 
 import anyio
+import anyio.abc
+from anyio import TASK_STATUS_IGNORED
 from async_generator import async_generator, asynccontextmanager, yield_
 
 from .grpclib.events import RequestReceived
@@ -71,28 +73,6 @@ class Servicer:
         raise NotImplementedError()
 
 
-def tcp_server_socket(host, port, family=socket.AF_INET, backlog=100,
-                      reuse_address=True, reuse_port=False, ssl_context=None):
-    raw_socket = socket.socket(family, socket.SOCK_STREAM)
-    try:
-        if reuse_address:
-            raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-
-        if reuse_port:
-            try:
-                raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, True)
-            except (AttributeError, OSError) as e:
-                log.warning('reuse_port=True option failed', exc_info=True)
-
-        raw_socket.bind((host, port))
-        raw_socket.listen(backlog)
-    except Exception:
-        raw_socket.close()
-        raise
-
-    return raw_socket
-
-
 @asynccontextmanager
 @async_generator
 async def _service_wrapper(service=None, setup_fn=None, teardown_fn=None):
@@ -133,35 +113,35 @@ class Server:
         else:
             raise ValueError("Shouldn't have happened")
 
-    def _create_socket_and_listen(self):
-        return tcp_server_socket('', self.port, reuse_address=True, reuse_port=True)
+    async def serve_async(self, *, task_status=TASK_STATUS_IGNORED):
+        """Run the grpc server
 
-    async def _run_async_server(self, raw_socket):
-        socket = anyio._get_asynclib().Socket(raw_socket)
+        The task_status protocol lets the caller know when the server is
+        listening, and yields the port number (same given to Server constructor).
+        """
+        # TODO: restore ssl support
+        assert not self._ssl
 
         # TODO: resource usage warning
         async with async_exit_stack.AsyncExitStack() as stack:
-            tcp_server = await stack.enter_async_context(
-                anyio._networking.SocketStreamServer(socket,
-                                                     self._ssl,
-                                                     self._ssl is not None, 
-                                                     False)
-            )
-            task_group = await stack.enter_async_context(anyio.create_task_group())
+            tcp_server = await anyio.create_tcp_listener(local_port=self.port, reuse_port=True)
+            task_status.started(self.port)
 
             services_dict = {}
             for key, value in self.services.items():
                 services_dict[key] = await stack.enter_async_context(value)
 
-            async for socket in tcp_server.accept_connections():
-                await task_group.spawn(ConnectionHandler(services_dict), socket)
-
-    def _target_fn(self, backend):
-        socket = self._create_socket_and_listen()
-        anyio.run(self._run_async_server, socket, backend=backend)
+            await tcp_server.serve(ConnectionHandler(services_dict))
 
     def serve(self, backend=None):
-        self._target_fn(backend)
+        """
+        DEPRECATED - use serve_async() instead
+
+        This function runs an entire async event loop (there can only be one
+        per thread), and there is no way to know when the server is ready for
+        connections.
+        """
+        anyio.run(self.serve_async, backend=backend)
 
 
 class ConnectionHandler:
@@ -227,16 +207,16 @@ class ConnectionHandler:
             log.warning("Got exception in request_received",
                         exc_info=log.getEffectiveLevel() == logging.DEBUG)
 
-    async def __call__(self, socket):
+    async def __call__(self, stream_: anyio.abc.SocketStream):
         # TODO: Should at least pass through GeneratorExit
         try:
-            async with GRPCProtoSocket(self.config, socket) as self.grpc_socket:
+            async with GRPCProtoSocket(self.config, stream_) as self.grpc_socket:
                 # TODO: resource usage warning
                 # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
                 # TODO: do we really need it here?
                 async with anyio.create_task_group() as task_group:
                     async for stream in self.grpc_socket.listen():
-                        await task_group.spawn(self.request_received, stream)
+                        task_group.start_soon(self.request_received, stream)
         except:
             # TODO: limit catch to Exception, so async cancel can propagate
             log.warning("Got exception in main dispatch loop",

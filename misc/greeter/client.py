@@ -16,13 +16,12 @@ async def worker(channel):
 
 
 async def main_coro():
-    # await curio.spawn(print_memory_growth_statistics(), daemon=True)
     async with purerpc.insecure_channel("localhost", 50055) as channel:
         for _ in range(100):
             start = time.time()
             async with anyio.create_task_group() as task_group:
                 for _ in range(100):
-                    await task_group.spawn(worker, channel)
+                    task_group.start_soon(worker, channel)
             print("RPS: {}".format(10000 / (time.time() - start)))
 
 

@@ -4,13 +4,12 @@
 #
 #    pip-compile --extra=test --output-file=requirements_test.txt setup.py
 #
-anyio==1.4.0
+anyio==3.5.0
     # via purerpc (setup.py)
 async-exit-stack==1.0.1
     # via purerpc (setup.py)
 async-generator==1.10
     # via
-    #   anyio
     #   purerpc (setup.py)
     #   trio
 attrs==21.4.0
@@ -18,8 +17,6 @@ attrs==21.4.0
     #   outcome
     #   pytest
     #   trio
-curio==1.5
-    # via purerpc (setup.py)
 grpcio==1.44.0
     # via
     #   grpcio-tools
@@ -75,7 +72,9 @@ tomli==2.0.1
 trio==0.20.0
     # via purerpc (setup.py)
 typing-extensions==4.1.1
-    # via importlib-metadata
+    # via
+    #   anyio
+    #   importlib-metadata
 uvloop==0.16.0
     # via purerpc (setup.py)
 zipp==3.8.0

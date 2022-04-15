@@ -37,6 +37,9 @@ def purerpc_echo_port(echo_pb2, echo_grpc):
             await yield_(echo_pb2.EchoReply(data="".join(data)))
 
     with run_purerpc_service_in_process(Servicer().service) as port:
+        # TODO: migrate to serve_async() to avoid timing problems
+        import time
+        time.sleep(.1)
         yield port
 
 

@@ -2,8 +2,10 @@ import sys
 import enum
 import socket
 import datetime
+from typing import Dict
 
 import anyio
+import anyio.abc
 import async_exit_stack
 from async_generator import async_generator, yield_, yield_from_
 from purerpc.utils import is_darwin, is_windows
@@ -16,28 +18,29 @@ from .grpclib.exceptions import StreamClosedError
 
 
 class SocketWrapper(async_exit_stack.AsyncExitStack):
-    def __init__(self, grpc_connection: GRPCConnection, sock: anyio.SocketStream):
+    def __init__(self, grpc_connection: GRPCConnection, sock: anyio.abc.SocketStream):
         super().__init__()
         self._set_socket_options(sock)
         self._socket = sock
         self._grpc_connection = grpc_connection
-        self._flush_event = anyio.create_event()
+        self._flush_event = anyio.Event()
         self._running = True
 
     async def __aenter__(self):
         await super().__aenter__()
         task_group = await self.enter_async_context(anyio.create_task_group())
-        await task_group.spawn(self._writer_thread)
+        task_group.start_soon(self._writer_thread)
 
         async def callback():
             self._running = False
-            await self._flush_event.set()
+            self._flush_event.set()
 
         self.push_async_callback(callback)
         return self
 
     @staticmethod
-    def _set_socket_options(sock: anyio.SocketStream):
+    def _set_socket_options(stream: anyio.abc.SocketStream):
+        sock = stream.extra(anyio.abc.SocketAttribute.raw_socket)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         if hasattr(socket, "TCP_KEEPIDLE"):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 300)
@@ -54,20 +57,20 @@ class SocketWrapper(async_exit_stack.AsyncExitStack):
         while True:
             data = self._grpc_connection.data_to_send()
             if data:
-                await self._socket.send_all(data)
+                await self._socket.send(data)
             elif self._running:
                 await self._flush_event.wait()
-                self._flush_event.clear()
+                self._flush_event = anyio.Event()
             else:
                 return
 
     async def flush(self):
         """This maybe called from different threads."""
-        await self._flush_event.set()
+        self._flush_event.set()
 
     async def recv(self, buffer_size: int):
         """This may only be called from single thread."""
-        return await self._socket.receive_some(buffer_size)
+        return await self._socket.receive(buffer_size)
 
 
 class GRPCStreamState(enum.Enum):
@@ -84,8 +87,8 @@ class GRPCStream:
         self._grpc_connection = grpc_connection
         self._grpc_socket = grpc_socket
         self._socket = socket
-        self._flow_control_update_event = anyio.create_event()
-        self._incoming_events = anyio.create_queue(sys.maxsize)
+        self._flow_control_update_event = anyio.Event()
+        self._incoming_events = anyio.create_memory_object_stream(max_buffer_size=sys.maxsize)  # (send, receive)
         self._response_started = False
         self._state = GRPCStreamState.OPEN
         self._start_stream_event = None
@@ -130,11 +133,11 @@ class GRPCStream:
             del self._grpc_socket._streams[self._stream_id]
 
     async def _set_flow_control_update(self):
-        await self._flow_control_update_event.set()
+        self._flow_control_update_event.set()
 
     async def _wait_flow_control_update(self):
         await self._flow_control_update_event.wait()
-        self._flow_control_update_event.clear()
+        self._flow_control_update_event = anyio.Event()
 
     async def _send(self, message: bytes, compress=False):
         message_write_buffer = MessageWriteBuffer(self._grpc_connection.config.message_encoding,
@@ -151,7 +154,7 @@ class GRPCStream:
             await self._socket.flush()
 
     async def _receive(self):
-        event = await self._incoming_events.get()
+        event = await self._incoming_events[1].receive()
         if isinstance(event, MessageReceived):
             self._grpc_connection.acknowledge_received_data(self._stream_id,
                                                             event.flow_controlled_length)
@@ -211,8 +214,8 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
         await self._socket.flush()
         if self.client_side:
             task_group = await self.enter_async_context(anyio.create_task_group())
-            self.push_async_callback(task_group.cancel_scope.cancel)
-            await task_group.spawn(self._reader_thread)
+            self.callback(task_group.cancel_scope.cancel)
+            task_group.start_soon(self._reader_thread)
         return self
 
     @property
@@ -245,7 +248,7 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
                 elif isinstance(event, RequestReceived):
                     self._allocate_stream(event.stream_id)
 
-                await self._streams[event.stream_id]._incoming_events.put(event)
+                await self._streams[event.stream_id]._incoming_events[0].send(event)
 
                 if isinstance(event, RequestReceived):
                     await yield_(self._streams[event.stream_id])

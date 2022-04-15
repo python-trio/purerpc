@@ -17,6 +17,8 @@ from purerpc.test_utils import run_purerpc_service_in_process
 @pytest.fixture
 def dummy_server_port():
     with run_purerpc_service_in_process(purerpc.Service("Greeter")) as port:
+        # TODO: migrate to serve_async() to avoid timing problems
+        time.sleep(0.1)
         yield port
 
 
@@ -35,7 +37,7 @@ def http2_client_connect(host, port):
         sock.close()
 
 
-def http2_receive_events(conn, sock, timeout=0.1):
+def http2_receive_events(conn, sock):
     try:
         sock.settimeout(0.1)
         events = []
