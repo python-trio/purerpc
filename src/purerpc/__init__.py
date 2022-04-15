@@ -1,5 +1,6 @@
 from .anyio_monkeypatch import apply_monkeypatch as _apply_anyio_monkeypatch
 
+# TODO: don't hack anyio.run()!
 _apply_anyio_monkeypatch()
 
 

@@ -218,10 +218,12 @@ class ConnectionHandler:
             except RpcFailedError as error:
                 await stream.close(error.status)
             except:
+                # TODO: limit catch to Exception, so async cancel can propagate
                 log.warning("Got exception while writing response stream",
                             exc_info=log.getEffectiveLevel() == logging.DEBUG)
                 await stream.close(Status(StatusCode.CANCELLED, status_message=repr(sys.exc_info())))
         except:
+            # TODO: limit catch to Exception, so async cancel can propagate
             log.warning("Got exception in request_received",
                         exc_info=log.getEffectiveLevel() == logging.DEBUG)
 
@@ -236,5 +238,6 @@ class ConnectionHandler:
                     async for stream in self.grpc_socket.listen():
                         await task_group.spawn(self.request_received, stream)
         except:
+            # TODO: limit catch to Exception, so async cancel can propagate
             log.warning("Got exception in main dispatch loop",
                         exc_info=log.getEffectiveLevel() == logging.DEBUG)
