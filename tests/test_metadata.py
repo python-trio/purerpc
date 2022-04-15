@@ -50,8 +50,6 @@ def test_metadata_grpc_client(greeter_pb2, greeter_pb2_grpc, channel):
     response = stub.SayHello(greeter_pb2.HelloRequest(name="World"), metadata=METADATA)
 
     received_metadata = pickle.loads(base64.b64decode(response.message))
-    assert received_metadata[-1][0] == "accept-encoding"
-    received_metadata = received_metadata[:-1]
     assert METADATA == received_metadata
 
 

@@ -63,25 +63,26 @@ def main():
         python_requires=">=3.5",
         install_requires=[
             "h2>=3.1.0,<4",
-            "protobuf>=3.5.1,<4",
-            "anyio>=1.0.0,<2",
-            "async_exit_stack>=1.0.1,<2",
-            "tblib>=1.3.2,<2",
-            "async_generator>=1.10,<2.0",
+            "protobuf>=3.5.1",
+            "anyio>=1.0.0,<2",  # TODO: anyio 3.x upgrade
+            "async_exit_stack>=1.0.1",
+            "tblib>=1.3.2",
+            "async_generator>=1.10",
         ],
         entry_points={
             "console_scripts": console_scripts,
         },
-        setup_requires=["pytest-runner"],
-        tests_require=[
-            "pytest",
-            "grpcio==1.25.0",           # fix version for PyPy
-            "grpcio_tools==1.25.0",     # same here
-            "uvloop",
-            "trio>=0.11",
-            "curio>=0.9",
-            "python-forge~=18.6",
-        ]
+        extras_require={
+            'test': [
+                "pytest",
+                "grpcio>=1.25.0",           # fix version for PyPy
+                "grpcio_tools>=1.25.0",     # same here
+                "uvloop",
+                "trio>=0.11",
+                "curio>=0.9",
+                "python-forge>=18.6",
+            ]
+        },
     )
 
 

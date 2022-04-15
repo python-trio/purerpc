@@ -1,6 +1,6 @@
 # purerpc
 
-[![Build Status](https://img.shields.io/travis/standy66/purerpc.svg?style=flat)](https://travis-ci.org/standy66/purerpc)
+[![Build Status](https://img.shields.io/github/workflow/status/python-trio/purerpc/CI)](https://github.com/python-trio/purerpc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/purerpc.svg?style=flat)](https://pypi.org/project/purerpc/)
 [![Downloads](https://pepy.tech/badge/purerpc/month)](https://pepy.tech/project/purerpc)
 

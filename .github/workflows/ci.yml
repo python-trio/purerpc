@@ -1,0 +1,40 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build_and_test_pinned:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ['3.6', '3.7', '3.8']  # 'pypy-3.6'
+        backend: [asyncio, curio, trio, uvloop]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: 'requirements_test*.txt'
+      - run: pip install . -r requirements_test_py36.txt
+        if: ${{ contains(matrix.python-version, '3.6') }}
+      - run: pip install . -r requirements_test.txt
+        if: ${{ !contains(matrix.python-version, '3.6') }}
+      - run: PURERPC_BACKEND=${{ matrix.backend }} pytest
+
+  build_and_test_latest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        backend: [asyncio, curio, trio, uvloop]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+      - run: pip install .[test]
+      - run: PURERPC_BACKEND=${{ matrix.backend }} pytest
