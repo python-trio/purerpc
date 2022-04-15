@@ -88,6 +88,7 @@ class GRPCStream:
         self._grpc_socket = grpc_socket
         self._socket = socket
         self._flow_control_update_event = anyio.Event()
+        # TODO: find a reasonable buffer size, or expose it in the API
         self._incoming_events = anyio.create_memory_object_stream(max_buffer_size=sys.maxsize)  # (send, receive)
         self._response_started = False
         self._state = GRPCStreamState.OPEN
