@@ -5,7 +5,6 @@ import argparse
 import multiprocessing
 
 import purerpc
-from async_generator import async_generator, yield_
 from generated.greeter_pb2 import HelloRequest, HelloReply
 from generated.greeter_grpc import GreeterServicer, GreeterStub
 
@@ -16,10 +15,9 @@ class Greeter(GreeterServicer):
     async def SayHello(self, message):
         return HelloReply(message=message.name)
 
-    @async_generator
     async def SayHelloToMany(self, input_messages):
         async for message in input_messages:
-            await yield_(HelloReply(message=message.name))
+            yield HelloReply(message=message.name)
 
 
 async def do_load_unary(result_queue, stub, num_requests, message_size):

@@ -6,8 +6,6 @@
 #
 anyio==3.5.0
     # via purerpc (setup.py)
-async-exit-stack==1.0.1
-    # via purerpc (setup.py)
 async-generator==1.10
     # via
     #   purerpc (setup.py)

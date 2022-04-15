@@ -3,7 +3,6 @@ import ssl
 
 import pytest
 import trustme
-from async_generator import async_generator, yield_
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, \
@@ -35,15 +34,13 @@ def purerpc_echo_port(echo_pb2, echo_grpc):
         async def Echo(self, message):
             return echo_pb2.EchoReply(data=message.data)
 
-        @async_generator
         async def EchoTwoTimes(self, message):
-            await yield_(echo_pb2.EchoReply(data=message.data))
-            await yield_(echo_pb2.EchoReply(data=message.data))
+            yield echo_pb2.EchoReply(data=message.data)
+            yield echo_pb2.EchoReply(data=message.data)
 
-        @async_generator
         async def EchoEachTime(self, messages):
             async for message in messages:
-                await yield_(echo_pb2.EchoReply(data=message.data))
+                yield echo_pb2.EchoReply(data=message.data)
 
         async def EchoLast(self, messages):
             data = []
@@ -51,12 +48,11 @@ def purerpc_echo_port(echo_pb2, echo_grpc):
                 data.append(message.data)
             return echo_pb2.EchoReply(data="".join(data))
 
-        @async_generator
         async def EchoLastV2(self, messages):
             data = []
             async for message in messages:
                 data.append(message.data)
-            await yield_(echo_pb2.EchoReply(data="".join(data)))
+            yield echo_pb2.EchoReply(data="".join(data))
 
     with run_purerpc_service_in_process(Servicer().service) as port:
         # TODO: migrate to serve_async() to avoid timing problems
@@ -71,15 +67,13 @@ def purerpc_echo_port_ssl(echo_pb2, echo_grpc, server_ssl_context):
         async def Echo(self, message):
             return echo_pb2.EchoReply(data=message.data)
 
-        @async_generator
         async def EchoTwoTimes(self, message):
-            await yield_(echo_pb2.EchoReply(data=message.data))
-            await yield_(echo_pb2.EchoReply(data=message.data))
+            yield echo_pb2.EchoReply(data=message.data)
+            yield echo_pb2.EchoReply(data=message.data)
 
-        @async_generator
         async def EchoEachTime(self, messages):
             async for message in messages:
-                await yield_(echo_pb2.EchoReply(data=message.data))
+                yield echo_pb2.EchoReply(data=message.data)
 
         async def EchoLast(self, messages):
             data = []
@@ -87,12 +81,11 @@ def purerpc_echo_port_ssl(echo_pb2, echo_grpc, server_ssl_context):
                 data.append(message.data)
             return echo_pb2.EchoReply(data="".join(data))
 
-        @async_generator
         async def EchoLastV2(self, messages):
             data = []
             async for message in messages:
                 data.append(message.data)
-            await yield_(echo_pb2.EchoReply(data="".join(data)))
+            yield echo_pb2.EchoReply(data="".join(data))
 
     with run_purerpc_service_in_process(Servicer().service,
                                         ssl_context=server_ssl_context) as port:
@@ -171,10 +164,9 @@ async def test_purerpc_client_random_payload(echo_pb2, echo_grpc, channel):
     stub = echo_grpc.EchoStub(channel)
     data = random_payload()
 
-    @async_generator
     async def gen():
         for _ in range(4):
-            await yield_(echo_pb2.EchoRequest(data=data))
+            yield echo_pb2.EchoRequest(data=data)
 
     assert (await stub.Echo(echo_pb2.EchoRequest(data=data))).data == data
     assert [response.data for response in await async_iterable_to_list(
@@ -191,10 +183,9 @@ async def test_purerpc_client_deadlock(echo_pb2, echo_grpc, channel):
     stub = echo_grpc.EchoStub(channel)
     data = random_payload(min_size=32000, max_size=64000)
 
-    @async_generator
     async def gen():
         for _ in range(20):
-            await yield_(echo_pb2.EchoRequest(data=data))
+            yield echo_pb2.EchoRequest(data=data)
 
     assert [response.data for response in await async_iterable_to_list(
             stub.EchoLastV2(gen()))] == [data * 20]
@@ -207,10 +198,9 @@ async def test_purerpc_ssl(echo_pb2, echo_grpc, purerpc_echo_port_ssl, client_ss
         stub = echo_grpc.EchoStub(channel)
         data = random_payload(min_size=32000, max_size=64000)
 
-        @async_generator
         async def gen():
             for _ in range(20):
-                await yield_(echo_pb2.EchoRequest(data=data))
+                yield echo_pb2.EchoRequest(data=data)
 
         assert [response.data for response in await async_iterable_to_list(
                 stub.EchoLastV2(gen()))] == [data * 20]

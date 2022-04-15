@@ -1,7 +1,6 @@
 import functools
 
 import pytest
-from async_generator import async_generator, yield_
 
 import purerpc
 
@@ -17,10 +16,9 @@ def name_generator(greeter_pb2):
         yield greeter_pb2.HelloRequest(name=name)
 
 
-@async_generator
 async def async_name_generator(greeter_pb2):
     for request in name_generator(greeter_pb2):
-        await yield_(request)
+        yield request
 
 
 @pytest.fixture(scope="module")
@@ -29,10 +27,9 @@ def purerpc_codegen_greeter_port(greeter_pb2, greeter_grpc):
         async def SayHello(self, message):
             return greeter_pb2.HelloReply(message="Hello, " + message.name)
 
-        @async_generator
         async def SayHelloGoodbye(self, message):
-            await yield_(greeter_pb2.HelloReply(message="Hello, " + message.name))
-            await yield_(greeter_pb2.HelloReply(message="Goodbye, " + message.name))
+            yield greeter_pb2.HelloReply(message="Hello, " + message.name)
+            yield greeter_pb2.HelloReply(message="Goodbye, " + message.name)
 
         async def SayHelloToManyAtOnce(self, messages):
             names = []
@@ -40,10 +37,9 @@ def purerpc_codegen_greeter_port(greeter_pb2, greeter_grpc):
                 names.append(message.name)
             return greeter_pb2.HelloReply(message="Hello, " + ", ".join(names))
 
-        @async_generator
         async def SayHelloToMany(self, messages):
             async for message in messages:
-                await yield_(greeter_pb2.HelloReply(message="Hello, " + message.name))
+                yield greeter_pb2.HelloReply(message="Hello, " + message.name)
 
     with run_purerpc_service_in_process(Servicer().service) as port:
         yield port
@@ -58,10 +54,9 @@ def purerpc_simple_greeter_port(greeter_pb2):
         return greeter_pb2.HelloReply(message="Hello, " + message.name)
 
     @service.rpc("SayHelloGoodbye")
-    @async_generator
     async def say_hello_goodbye(message: greeter_pb2.HelloRequest) -> purerpc.Stream[greeter_pb2.HelloReply]:
-        await yield_(greeter_pb2.HelloReply(message="Hello, " + message.name))
-        await yield_(greeter_pb2.HelloReply(message="Goodbye, " + message.name))
+        yield greeter_pb2.HelloReply(message="Hello, " + message.name)
+        yield greeter_pb2.HelloReply(message="Goodbye, " + message.name)
 
     @service.rpc("SayHelloToManyAtOnce")
     async def say_hello_to_many_at_once(messages: purerpc.Stream[greeter_pb2.HelloRequest]) -> greeter_pb2.HelloReply:
@@ -71,10 +66,9 @@ def purerpc_simple_greeter_port(greeter_pb2):
         return greeter_pb2.HelloReply(message="Hello, " + ', '.join(names))
 
     @service.rpc("SayHelloToMany")
-    @async_generator
     async def say_hello_to_many(messages: purerpc.Stream[greeter_pb2.HelloRequest]) -> purerpc.Stream[greeter_pb2.HelloReply]:
         async for message in messages:
-            await yield_(greeter_pb2.HelloReply(message="Hello, " + message.name))
+            yield greeter_pb2.HelloReply(message="Hello, " + message.name)
 
 
     with run_purerpc_service_in_process(service) as port:

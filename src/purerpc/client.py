@@ -1,7 +1,7 @@
 import functools
+from contextlib import AsyncExitStack
 
 import anyio
-import async_exit_stack
 
 from purerpc.grpc_proto import GRPCProtoSocket
 from purerpc.grpclib.config import GRPCConfiguration
@@ -10,7 +10,7 @@ from purerpc.wrappers import ClientStubUnaryUnary, ClientStubStreamStream, Clien
     ClientStubStreamUnary
 
 
-class _Channel(async_exit_stack.AsyncExitStack):
+class _Channel(AsyncExitStack):
     def __init__(self, host, port, ssl_context=None):
         super().__init__()
         self._host = host

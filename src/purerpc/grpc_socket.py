@@ -2,12 +2,11 @@ import sys
 import enum
 import socket
 import datetime
+from contextlib import AsyncExitStack
 from typing import Dict
 
 import anyio
 import anyio.abc
-import async_exit_stack
-from async_generator import async_generator, yield_, yield_from_
 from purerpc.utils import is_darwin, is_windows
 from purerpc.grpclib.exceptions import ProtocolError
 
@@ -17,7 +16,7 @@ from .grpclib.buffers import MessageWriteBuffer
 from .grpclib.exceptions import StreamClosedError
 
 
-class SocketWrapper(async_exit_stack.AsyncExitStack):
+class SocketWrapper(AsyncExitStack):
     def __init__(self, grpc_connection: GRPCConnection, stream: anyio.abc.SocketStream):
         super().__init__()
         self._set_socket_options(stream)
@@ -197,7 +196,7 @@ class GRPCStream:
 
 # TODO: this name is not correct, should be something like GRPCConnection (but this name is already
 # occupied)
-class GRPCSocket(async_exit_stack.AsyncExitStack):
+class GRPCSocket(AsyncExitStack):
     StreamClass = GRPCStream
 
     def __init__(self, config: GRPCConfiguration, sock,
@@ -230,7 +229,6 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
         self._streams[stream_id] = self._stream_ctor(stream_id)
         return self._streams[stream_id]
 
-    @async_generator
     async def _listen(self):
         while True:
             data = await self._socket.recv(self._receive_buffer_size)
@@ -252,7 +250,7 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
                 await self._streams[event.stream_id]._incoming_events[0].send(event)
 
                 if isinstance(event, RequestReceived):
-                    await yield_(self._streams[event.stream_id])
+                    yield self._streams[event.stream_id]
                 elif isinstance(event, ResponseEnded) or isinstance(event, RequestEnded):
                     self._streams[event.stream_id]._close_remote()
 
@@ -260,11 +258,12 @@ class GRPCSocket(async_exit_stack.AsyncExitStack):
         async for _ in self._listen():
             raise ProtocolError("Received request on client end")
 
-    @async_generator
     async def listen(self):
         if self.client_side:
             raise ValueError("Cannot listen client-side socket")
-        await yield_from_(self._listen())
+
+        async for value in self._listen():
+            yield value
 
     async def start_request(self, scheme: str, service_name: str, method_name: str,
                             message_type=None, authority=None, timeout: datetime.timedelta=None,

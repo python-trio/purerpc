@@ -3,14 +3,13 @@ import inspect
 import collections
 import functools
 
-import async_exit_stack
 import logging
+from contextlib import asynccontextmanager, AsyncExitStack
 
 import anyio
 import anyio.abc
 from anyio import TASK_STATUS_IGNORED
 from anyio.streams.tls import TLSListener
-from async_generator import async_generator, asynccontextmanager, yield_
 
 from .grpclib.events import RequestReceived
 from .grpclib.status import Status, StatusCode
@@ -75,12 +74,11 @@ class Servicer:
 
 
 @asynccontextmanager
-@async_generator
 async def _service_wrapper(service=None, setup_fn=None, teardown_fn=None):
     if setup_fn is not None:
-        await yield_(await setup_fn())
+        yield await setup_fn()
     else:
-        await yield_(service)
+        yield service
 
     if teardown_fn is not None:
         await teardown_fn()
@@ -122,7 +120,7 @@ class Server:
         """
 
         # TODO: resource usage warning
-        async with async_exit_stack.AsyncExitStack() as stack:
+        async with AsyncExitStack() as stack:
             tcp_server = await anyio.create_tcp_listener(local_port=self.port, reuse_port=True)
             # read the resulting port, in case it was 0
             self.port = tcp_server.extra(anyio.abc.SocketAttribute.local_port)
