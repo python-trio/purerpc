@@ -17,11 +17,15 @@ attrs==21.4.0
     #   outcome
     #   pytest
     #   trio
+cffi==1.15.0
+    # via cryptography
 contextvars==2.4
     # via
     #   anyio
     #   sniffio
     #   trio
+cryptography==36.0.2
+    # via trustme
 dataclasses==0.8
     # via anyio
 grpcio==1.44.0
@@ -40,6 +44,7 @@ idna==3.3
     # via
     #   anyio
     #   trio
+    #   trustme
 immutables==0.17
     # via contextvars
 importlib-metadata==4.8.3
@@ -60,6 +65,8 @@ protobuf==3.19.4
     #   purerpc (setup.py)
 py==1.11.0
     # via pytest
+pycparser==2.21
+    # via cffi
 pyparsing==3.0.8
     # via packaging
 pytest==7.0.1
@@ -79,6 +86,8 @@ tblib==1.7.0
 tomli==1.2.3
     # via pytest
 trio==0.19.0
+    # via -r requirements_test.in
+trustme==0.9.0
     # via -r requirements_test.in
 typing-extensions==4.1.1
     # via

@@ -80,6 +80,7 @@ def main():
                 "uvloop",
                 "trio>=0.11",
                 "python-forge>=18.6",
+                "trustme",
             ]
         },
     )

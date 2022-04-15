@@ -9,6 +9,7 @@ import logging
 import anyio
 import anyio.abc
 from anyio import TASK_STATUS_IGNORED
+from anyio.streams.tls import TLSListener
 from async_generator import async_generator, asynccontextmanager, yield_
 
 from .grpclib.events import RequestReceived
@@ -88,7 +89,7 @@ async def _service_wrapper(service=None, setup_fn=None, teardown_fn=None):
 class Server:
     def __init__(self, port=50055, ssl_context=None):
         self.port = port
-        self._ssl = ssl_context
+        self._ssl_context = ssl_context
         self.services = {}
 
     def add_service(self, service=None, context_manager=None, setup_fn=None, teardown_fn=None, name=None):
@@ -119,12 +120,15 @@ class Server:
         The task_status protocol lets the caller know when the server is
         listening, and yields the port number (same given to Server constructor).
         """
-        # TODO: restore ssl support
-        assert not self._ssl
 
         # TODO: resource usage warning
         async with async_exit_stack.AsyncExitStack() as stack:
             tcp_server = await anyio.create_tcp_listener(local_port=self.port, reuse_port=True)
+            # read the resulting port, in case it was 0
+            self.port = tcp_server.extra(anyio.abc.SocketAttribute.local_port)
+            if self._ssl_context:
+                tcp_server = TLSListener(tcp_server, self._ssl_context,
+                                         standard_compatible=False)
             task_status.started(self.port)
 
             services_dict = {}
