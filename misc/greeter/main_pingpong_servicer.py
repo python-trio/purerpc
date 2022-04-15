@@ -1,6 +1,3 @@
-import argparse
-import multiprocessing
-
 from purerpc.server import Server
 from generated.greeter_pb2 import HelloReply
 from generated.greeter_grpc import GreeterServicer
@@ -54,15 +51,6 @@ class Greeter(GreeterServicer):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--num_processes", default=0, type=int)
-    args = parser.parse_args()
-
-    if args.num_processes == 0:
-        num_processes = multiprocessing.cpu_count()
-    else:
-        num_processes = args.num_processes
-
-    server = Server(50055, num_processes=num_processes)
+    server = Server(50055)
     server.add_service(Greeter().service)
     server.serve()

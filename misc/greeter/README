@@ -1,0 +1,33 @@
+Usage notes
+
+$ python main_pingpong_servicer.py
+# (another terminal)
+$ python client.py
+RPS: 942.7659800962675
+RPS: 928.7526104604065
+RPS: 856.73468437314
+...
+
+$ python failing_server.py
+# (another terminal)
+$ python failing_client.py
+Round 0 rps 894.274406271697 avg latency 110.80834655761724
+Round 1 rps 821.6505728334758 avg latency 120.84926767349245
+Round 2 rps 786.0224822867286 avg latency 126.15007748603823
+...
+
+$ python baseline_main.py
+# (another terminal)
+$ python test_perf_grpcio.py  --load_type unary
+Round 0, RPS: 2653.0537795880555, avg latency: 112.15578104654948 ms, max latency: 113.03731441497803 ms
+Round 1, RPS: 2785.6302402624187, avg latency: 107.29748307863872 ms, max latency: 107.88612365722656 ms
+Round 2, RPS: 2755.1956914726525, avg latency: 108.47193616231284 ms, max latency: 108.89975547790527 ms
+...
+
+$ python main.py
+# (another terminal)
+$ python test_perf.py --load_type unary
+Round 0, RPS: 1213.7552524716182, avg latency: 246.56518713633216 ms, max latency: 249.38842296600342 ms
+Round 1, RPS: 1325.8140062285606, avg latency: 225.77957820892334 ms, max latency: 231.95827960968018 ms
+Round 2, RPS: 1387.5940927539905, avg latency: 215.69242871602378 ms, max latency: 218.73981952667236 ms
+...

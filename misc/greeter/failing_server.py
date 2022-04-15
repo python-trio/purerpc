@@ -27,7 +27,7 @@ class Servicer(GreeterServicer):
 
 
 def main():
-    server = purerpc.Server(50055, num_processes=1)
+    server = purerpc.Server(50055)
     server.add_service(Servicer().service)
     server.serve()
 
