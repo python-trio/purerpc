@@ -2,7 +2,6 @@ import functools
 import collections
 import subprocess
 import multiprocessing
-import multiprocessing.connection
 import tempfile
 import shutil
 import os
@@ -14,6 +13,7 @@ import contextlib
 import time
 import random
 import string
+from multiprocessing.connection import Connection
 
 from tblib import pickling_support
 pickling_support.install()
@@ -21,6 +21,11 @@ pickling_support.install()
 import forge
 import anyio
 from async_generator import aclosing
+
+
+# work around pickle issue on macOS
+if sys.platform == 'darwin':
+    multiprocessing = multiprocessing.get_context('fork')
 
 
 @contextlib.contextmanager
@@ -60,7 +65,7 @@ def compile_temp_proto(*relative_proto_paths):
 _WrappedResult = collections.namedtuple("_WrappedResult", ("result", "exc_info"))
 
 
-def _wrap_gen_in_process(conn: multiprocessing.connection.Connection):
+def _wrap_gen_in_process(conn: Connection):
     def decorator(gen):
         @functools.wraps(gen)
         def new_func(*args, **kwargs):
