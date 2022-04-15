@@ -11,7 +11,7 @@ from purerpc.grpclib.exceptions import ProtocolError
 
 from .grpclib.connection import GRPCConfiguration, GRPCConnection
 from .grpclib.events import RequestReceived, RequestEnded, ResponseEnded, MessageReceived, WindowUpdated
-from .grpclib.buffers import MessageWriteBuffer, MessageReadBuffer
+from .grpclib.buffers import MessageWriteBuffer
 from .grpclib.exceptions import StreamClosedError
 
 

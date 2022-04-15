@@ -1,6 +1,5 @@
 import datetime
 
-from purerpc.grpclib.config import GRPCConfiguration
 from purerpc.grpclib.events import MessageReceived, RequestEnded, ResponseEnded
 
 from .grpc_socket import GRPCStream, GRPCSocket

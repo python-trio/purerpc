@@ -5,7 +5,7 @@ import base64
 import pytest
 
 from purerpc.test_utils import (run_purerpc_service_in_process, run_grpc_service_in_process, grpc_client_parallelize,
-                                grpc_channel, async_test, purerpc_client_parallelize, purerpc_channel)
+                                grpc_channel, async_test, purerpc_channel)
 
 
 METADATA = (

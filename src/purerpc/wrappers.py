@@ -1,7 +1,5 @@
-import functools
-
 import anyio
-from async_generator import aclosing, async_generator, asynccontextmanager, yield_, yield_from_
+from async_generator import aclosing, async_generator, yield_, yield_from_
 
 from .grpclib.exceptions import ProtocolError, raise_status
 from .grpclib.status import Status, StatusCode

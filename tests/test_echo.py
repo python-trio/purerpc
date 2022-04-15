@@ -1,5 +1,4 @@
 import functools
-import time
 
 import pytest
 from async_generator import async_generator, yield_

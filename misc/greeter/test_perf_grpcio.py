@@ -6,8 +6,6 @@
 
 
 import time
-import anyio
-import sys
 import argparse
 import functools
 from queue import Queue

@@ -13,10 +13,8 @@ from .grpclib.events import RequestReceived
 from .grpclib.status import Status, StatusCode
 from .grpclib.exceptions import RpcFailedError
 from purerpc.grpc_proto import GRPCProtoStream, GRPCProtoSocket
-from purerpc.grpc_socket import GRPCSocket, GRPCStream
 from purerpc.rpc import RPCSignature, Cardinality
-from purerpc.utils import is_linux, get_linux_kernel_version
-from purerpc.wrappers import stream_to_async_iterator, call_server_unary_unary, \
+from purerpc.wrappers import call_server_unary_unary, \
     call_server_unary_stream, call_server_stream_unary, call_server_stream_stream
 
 from .grpclib.connection import GRPCConfiguration

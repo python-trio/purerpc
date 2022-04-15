@@ -14,7 +14,7 @@ from .status import Status
 from .config import GRPCConfiguration
 from .events import MessageReceived, RequestReceived, RequestEnded, ResponseReceived, ResponseEnded, WindowUpdated
 from .exceptions import ProtocolError, StreamClosedError
-from .buffers import MessageReadBuffer, MessageWriteBuffer
+from .buffers import MessageReadBuffer
 from ._h2_monkeypatch import apply_patch
 
 apply_patch()

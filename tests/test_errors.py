@@ -6,7 +6,7 @@ from async_generator import async_generator, aclosing, yield_
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
-    grpc_client_parallelize, purerpc_channel, purerpc_client_parallelize, async_test
+    grpc_client_parallelize, purerpc_channel, async_test
 
 
 @pytest.fixture(scope="module")
