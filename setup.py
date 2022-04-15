@@ -17,7 +17,7 @@ def main():
         version=__version__,
         license="Apache License Version 2.0",
         description=("Asynchronous pure Python gRPC client and server implementation "
-                     "supporting asyncio, uvloop, curio and trio"),
+                     "supporting asyncio, uvloop, trio"),
         long_description='%s\n%s' % (
             re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.md')),
             re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read('RELEASE.md'))
@@ -64,7 +64,7 @@ def main():
         install_requires=[
             "h2>=3.1.0,<4",
             "protobuf>=3.5.1",
-            "anyio>=1.0.0,<2",  # TODO: anyio 3.x upgrade
+            "anyio>=3.0.0",
             "async_exit_stack>=1.0.1",
             "tblib>=1.3.2",
             "async_generator>=1.10",
@@ -79,8 +79,8 @@ def main():
                 "grpcio_tools>=1.25.0",     # same here
                 "uvloop",
                 "trio>=0.11",
-                "curio>=0.9",
                 "python-forge>=18.6",
+                "trustme",
             ]
         },
     )

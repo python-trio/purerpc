@@ -103,7 +103,7 @@ class ClientStubStreamUnary(ClientStub):
     async def __call__(self, message_aiter, *, metadata=None):
         stream = await self._stream_fn(metadata=metadata)
         async with anyio.create_task_group() as task_group:
-            await task_group.spawn(send_multiple_messages_client, stream, message_aiter)
+            task_group.start_soon(send_multiple_messages_client, stream, message_aiter)
             return await extract_message_from_singleton_stream(stream)
 
 
@@ -112,7 +112,7 @@ class ClientStubStreamStream(ClientStub):
     async def call_aiter(self, message_aiter, metadata):
         stream = await self._stream_fn(metadata=metadata)
         async with anyio.create_task_group() as task_group:
-            await task_group.spawn(send_multiple_messages_client, stream, message_aiter)
+            task_group.start_soon(send_multiple_messages_client, stream, message_aiter)
             await yield_from_(stream_to_async_iterator(stream))
 
     async def call_stream(self, metadata):

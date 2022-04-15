@@ -29,7 +29,7 @@ async def do_load_unary(result_queue, stub, num_requests, message_size):
         result = (await stub.SayHello(HelloRequest(name=message))).message
         assert (len(result) == message_size)
     avg_latency = (time.time() - start) / num_requests
-    await result_queue.put(avg_latency)
+    await result_queue.send(avg_latency)
 
 
 async def do_load_stream(result_queue, stub, num_requests, message_size):
@@ -43,7 +43,7 @@ async def do_load_stream(result_queue, stub, num_requests, message_size):
     avg_latency = (time.time() - start) / num_requests
     await stream.close()
     await stream.receive_message()
-    await result_queue.put(avg_latency)
+    await result_queue.send(avg_latency)
 
 
 async def worker(port, queue, num_concurrent_streams, num_requests_per_stream,
@@ -58,16 +58,16 @@ async def worker(port, queue, num_concurrent_streams, num_requests_per_stream,
             raise ValueError(f"Unknown load type: {load_type}")
         for _ in range(num_rounds):
             start = time.time()
-            task_results = anyio.create_queue(sys.maxsize)
+            send_queue, receive_queue = anyio.create_memory_object_stream(max_buffer_size=sys.maxsize)
             async with anyio.create_task_group() as task_group:
                 for _ in range(num_concurrent_streams):
-                    await task_group.spawn(load_fn, task_results, stub, num_requests_per_stream, message_size)
+                    task_group.start_soon(load_fn, send_queue, stub, num_requests_per_stream, message_size)
             end = time.time()
             rps = num_concurrent_streams * num_requests_per_stream / (end - start)
             queue.put(rps)
             results = []
             for _ in range(num_concurrent_streams):
-                results.append(await task_results.get())
+                results.append(await receive_queue.receive())
             queue.put(results)
         queue.close()
         queue.join_thread()

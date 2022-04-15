@@ -118,25 +118,38 @@ def _run_context_manager_generator_in_process(cm_gen):
             parent_conn.close()
 
 
-def run_purerpc_service_in_process(service):
+def run_purerpc_service_in_process(service, ssl_context=None):
+    # TODO: there is no reason to run the server as a separate process...
+    #   just use serve_async().  This synchronous cm has timing problems,
+    #   because the server may not be listening before yielding to the body.
+
     def target_fn():
         import purerpc
-        server = purerpc.Server(port=0)
+        import socket
+
+        # Grab an ephemeral port in advance, because we need to yield the port
+        # before blocking on serve()...
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+
+        server = purerpc.Server(port=port, ssl_context=ssl_context)
         server.add_service(service)
-        socket = server._create_socket_and_listen()
-        yield socket.getsockname()[1]
+        yield port
+        server.serve()
 
-        async def sleep_10_seconds_then_die():
-            await anyio.sleep(20)
-            raise ValueError
-
-        async def main():
-            async with anyio.create_task_group() as tg:
-                await tg.spawn(server._run_async_server, socket)
-                await tg.spawn(sleep_10_seconds_then_die)
+        # async def sleep_10_seconds_then_die():
+        #     await anyio.sleep(20)
+        #     raise ValueError
+        #
+        # async def main():
+        #     async with anyio.create_task_group() as tg:
+        #         tg.start_soon(server.serve_async)
+        #         tg.start_soon(sleep_10_seconds_then_die)
+        #
         # import cProfile
-        anyio.run(server._run_async_server, socket)
         # cProfile.runctx("anyio.run(main)", globals(), locals(), sort="tottime")
+
     return _run_context_manager_generator_in_process(target_fn)
 
 
@@ -208,7 +221,7 @@ def purerpc_client_parallelize(num_tasks):
         async def new_corofunc(**kwargs):
             async with anyio.create_task_group() as tg:
                 for _ in range(num_tasks):
-                    await tg.spawn(functools.partial(corofunc, **kwargs))
+                    tg.start_soon(functools.partial(corofunc, **kwargs))
         return new_corofunc
     return decorator
 

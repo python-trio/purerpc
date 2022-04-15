@@ -7,7 +7,6 @@
 Asynchronous pure Python gRPC client and server implementation supporting
 [asyncio](https://docs.python.org/3/library/asyncio.html),
 [uvloop](https://github.com/MagicStack/uvloop),
-[curio](https://github.com/dabeaz/curio) and
 [trio](https://github.com/python-trio/trio) (achieved with [anyio](https://github.com/agronholm/anyio) compatibility layer).
 
 ## Requirements
@@ -29,7 +28,7 @@ Latest development version:
 pip install git+https://github.com/standy66/purerpc.git
 ```
 
-By default purerpc uses asyncio event loop, if you want to use uvloop, curio or trio, please install them manually.
+By default purerpc uses asyncio event loop, if you want to use uvloop or trio, please install them manually.
 
 ## protoc plugin
 
@@ -57,9 +56,9 @@ Just mark yielding coroutines with `@async_generator` decorator and use `await y
 ### Server
 
 ```python
+from purerpc import Server
 from greeter_pb2 import HelloRequest, HelloReply
 from greeter_grpc import GreeterServicer
-from purerpc import Server
 
 
 class Greeter(GreeterServicer):
@@ -71,15 +70,17 @@ class Greeter(GreeterServicer):
             yield HelloReply(message=f"Hello, {message.name}")
 
 
-server = Server(50055)
-server.add_service(Greeter().service)
-server.serve(backend="asyncio")  # backend can also be one of: "uvloop", "curio", "trio"
+if __name__ == '__main__':
+    server = Server(50055)
+    server.add_service(Greeter().service)
+    # NOTE: if you already have an async loop running, use "await server.serve_async()"
+    import anyio
+    anyio.run(server.serve_async)  # or set explicit backend="asyncio" or "trio"
 ```
 
 ### Client
 
 ```python
-import anyio
 import purerpc
 from greeter_pb2 import HelloRequest, HelloReply
 from greeter_grpc import GreeterStub
@@ -90,7 +91,7 @@ async def gen():
         yield HelloRequest(name=str(i))
 
 
-async def main():
+async def listen():
     async with purerpc.insecure_channel("localhost", 50055) as channel:
         stub = GreeterStub(channel)
         reply = await stub.SayHello(HelloRequest(name="World"))
@@ -100,8 +101,10 @@ async def main():
             print(reply.message)
 
 
-if __name__ == "__main__":
-    anyio.run(main, backend="asyncio")  # backend can also be one of: "uvloop", "curio", "trio"
+if __name__ == '__main__':
+    # NOTE: if you already have an async loop running, use "await listen()"
+    import anyio
+    anyio.run(listen)  # or set explicit backend="asyncio" or "trio"
 ```
 
 You can mix server and client code, for example make a server that requests something using purerpc from another gRPC server, etc.

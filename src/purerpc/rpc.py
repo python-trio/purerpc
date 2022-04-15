@@ -1,6 +1,7 @@
 import enum
 import typing
 import collections
+import collections.abc
 
 
 Stream = typing.AsyncIterator
