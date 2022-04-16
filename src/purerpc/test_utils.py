@@ -22,6 +22,7 @@ import forge
 import anyio
 from async_generator import aclosing
 
+from .utils import run as purerpc_run
 
 # work around pickle issue on macOS
 if sys.platform == 'darwin':
@@ -148,7 +149,7 @@ def run_purerpc_service_in_process(service, ssl_context=None):
         #         tg.start_soon(sleep_10_seconds_then_die)
         #
         # import cProfile
-        # cProfile.runctx("anyio.run(main)", globals(), locals(), sort="tottime")
+        # cProfile.runctx("purerpc_run(main)", globals(), locals(), sort="tottime")
 
     return _run_context_manager_generator_in_process(target_fn)
 
@@ -197,7 +198,7 @@ def async_test(corofunc):
 
     @functools.wraps(corofunc)
     def func(**kwargs):
-        return anyio.run(functools.partial(corofunc, **kwargs))
+        return purerpc_run(functools.partial(corofunc, **kwargs))
     return func
 
 

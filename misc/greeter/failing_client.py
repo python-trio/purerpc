@@ -61,5 +61,7 @@ async def worker(port, num_concurrent_streams, num_requests_per_stream,
 
 
 if __name__ == "__main__":
-    anyio.run(worker, 50055, 100, 50, 10, 1000, "unary")
-
+    try:
+        purerpc.run(worker, 50055, 100, 50, 10, 1000, "unary")
+    except KeyboardInterrupt:
+        pass

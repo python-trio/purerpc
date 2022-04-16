@@ -14,6 +14,7 @@ from anyio.streams.tls import TLSListener
 from .grpclib.events import RequestReceived
 from .grpclib.status import Status, StatusCode
 from .grpclib.exceptions import RpcFailedError
+from .utils import run as purerpc_run
 from purerpc.grpc_proto import GRPCProtoStream, GRPCProtoSocket
 from purerpc.rpc import RPCSignature, Cardinality
 from purerpc.wrappers import call_server_unary_unary, \
@@ -143,7 +144,7 @@ class Server:
         per thread), and there is no way to know when the server is ready for
         connections.
         """
-        anyio.run(self.serve_async, backend=backend)
+        purerpc_run(self.serve_async, backend=backend)
 
 
 class ConnectionHandler:

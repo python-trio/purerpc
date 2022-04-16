@@ -26,8 +26,11 @@ async def main_coro():
 
 
 def main():
-    anyio.run(main_coro)
+    purerpc.run(main_coro)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

@@ -1,7 +1,12 @@
-import platform
-import anyio
-import pdb
+import logging
 import math
+import os
+import platform
+import pdb
+
+import anyio
+
+_log = logging.getLogger(__name__)
 
 
 def is_linux():
@@ -35,3 +40,21 @@ async def print_memory_growth_statistics(interval_sec=10.0, set_pdb_trace_every=
         if num_iters == set_pdb_trace_every:
             pdb.set_trace()
             num_iters = 0
+
+
+def run(func, *args, backend=None, backend_options=None):
+    """wrapper for anyio.run() with some purerpc-specific conventions
+
+      * if `backend` is None, read it from PURERPC_BACKEND environment variable,
+        (still defaulting to asyncio)
+      * allow "uvloop" as a value of `backend` (normally uvloop needs to
+        be specified via `backend_options` under asyncio)
+    """
+
+    if backend is None:
+        backend = os.getenv("PURERPC_BACKEND", "asyncio")
+    _log.info("purerpc.run() selected {} backend".format(backend))
+    if backend == "uvloop":
+        backend = "asyncio"
+        backend_options = dict(use_uvloop=True)
+    return anyio.run(func, *args, backend=backend, backend_options=backend_options)

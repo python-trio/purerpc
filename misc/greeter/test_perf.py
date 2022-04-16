@@ -71,7 +71,7 @@ async def worker(port, queue, num_concurrent_streams, num_requests_per_stream,
         queue.join_thread()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--message_size", type=int, default=1000)
     parser.add_argument("--num_workers", type=int, default=3)
@@ -87,9 +87,9 @@ if __name__ == "__main__":
     with run_purerpc_service_in_process(Greeter().service) as port:
         def target_fn(worker_id):
             queue = queues[worker_id]
-            anyio.run(worker, port, queue, args.num_concurrent_streams,
-                      args.num_requests_per_stream, args.num_rounds, args.message_size,
-                      args.load_type)
+            purerpc.run(worker, port, queue, args.num_concurrent_streams,
+                        args.num_requests_per_stream, args.num_rounds, args.message_size,
+                        args.load_type)
 
         processes = []
         for worker_id in range(args.num_workers):
@@ -114,3 +114,10 @@ if __name__ == "__main__":
 
         for process in processes:
             process.join()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

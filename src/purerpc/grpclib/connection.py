@@ -17,6 +17,7 @@ from .exceptions import ProtocolError, StreamClosedError
 from .buffers import MessageReadBuffer
 from ._h2_monkeypatch import apply_patch
 
+# TODO: stop runtime patching of the h2 module
 apply_patch()
 
 logger = logging.getLogger(__name__)
