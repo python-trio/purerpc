@@ -153,6 +153,8 @@ def run_purerpc_service_in_process(service, ssl_context=None):
     return _run_context_manager_generator_in_process(target_fn)
 
 
+# TODO: remove grpcio dependency from tests.  There is no reason to unit test
+#  grpc project's code, and it's blocking pypy support.
 def run_grpc_service_in_process(add_handler_fn):
     def target_fn():
         import grpc

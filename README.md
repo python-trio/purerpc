@@ -14,6 +14,10 @@ Asynchronous pure Python gRPC client and server implementation supporting
 * CPython >= 3.7
 * PyPy >= 3.7
 
+NOTE: PyPy support is tentative, as grpcio dependency [doesn't officially
+  suport it](https://github.com/grpc/grpc/issues/4221).  (The dependency should
+be removed, since it's only used by tests, examples, and offline tools.)
+
 ## Installation
 
 Latest PyPI version:
