@@ -19,7 +19,7 @@ def main():
         description=("Native, async Python gRPC client and server implementation "
                      "supporting asyncio, uvloop, trio"),
         long_description=(
-            re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.md'))
+            re.compile(r'\bstart-badges\b.*\bend-badges\b', re.M | re.S).sub('', read('README.md'))
         ),
         long_description_content_type='text/markdown',
         author="Andrew Stepanov",

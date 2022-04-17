@@ -1,8 +1,10 @@
 # purerpc
 
+<!-- start-badges -->
 [![Build Status](https://img.shields.io/github/workflow/status/python-trio/purerpc/CI)](https://github.com/python-trio/purerpc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/purerpc.svg?style=flat)](https://pypi.org/project/purerpc/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/purerpc.svg)](https://pypi.org/project/purerpc)
+<!-- end-badges -->
 
 _purerpc_ is a native, async Python gRPC client and server implementation supporting
 [asyncio](https://docs.python.org/3/library/asyncio.html),
