@@ -1,5 +1,19 @@
 # Release history
 
+## (pending)
+
+### Features
+
+* add Server.serve_async(), allowing the grpc server to run concurrently
+  with other async tasks.  (Server.serve() is deprecated.)
+* upgrade anyio dependency, which will resolve conflicts when trying to use
+  purerpc together with other packages depending on anyio
+
+### BREAKING CHANGES
+
+* drop curio backend support (since anyio has dropped it)
+* drop Python 3.5, 3.6 support
+
 
 ## [Release 0.6.1](https://github.com/python-trio/purerpc/compare/v0.6.0...v0.6.1) (2020-04-13)
 
