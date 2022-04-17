@@ -1,99 +1,101 @@
-# [Release 0.6.1](https://github.com/standy66/purerpc/compare/v0.6.0...v0.6.1) (2020-04-13)
+# Release history
 
+
+## [Release 0.6.1](https://github.com/python-trio/purerpc/compare/v0.6.0...v0.6.1) (2020-04-13)
 
 ### Bug Fixes
 
-* build in PyPy 3.6, remove 3.5 builds from CI ([d1bcc9d](https://github.com/standy66/purerpc/commit/d1bcc9d))
-* remove CPython 3.5 builds ([7488ba8](https://github.com/standy66/purerpc/commit/7488ba8))
+* build in PyPy 3.6, remove 3.5 builds from CI ([d1bcc9d](https://github.com/python-trio/purerpc/commit/d1bcc9d))
+* remove CPython 3.5 builds ([7488ba8](https://github.com/python-trio/purerpc/commit/7488ba8))
 
 
 
-# [Release 0.6.0](https://github.com/standy66/purerpc/compare/v0.5.2...v0.6.0) (2020-04-13)
+## [Release 0.6.0](https://github.com/python-trio/purerpc/compare/v0.5.2...v0.6.0) (2020-04-13)
 
 ### Features
 
 * Add TLS Support
 
 
-# [Release 0.5.2](https://github.com/standy66/purerpc/compare/v0.5.1...v0.5.2) (2019-07-23)
+## [Release 0.5.2](https://github.com/python-trio/purerpc/compare/v0.5.1...v0.5.2) (2019-07-23)
 
 
 ### Features
 
-* additional exception shielding for asyncio ([3cbd35c](https://github.com/standy66/purerpc/commit/3cbd35c))
+* additional exception shielding for asyncio ([3cbd35c](https://github.com/python-trio/purerpc/commit/3cbd35c))
 
 
 
-# [Release 0.5.1](https://github.com/standy66/purerpc/compare/v0.5.0...v0.5.1) (2019-07-23)
+## [Release 0.5.1](https://github.com/python-trio/purerpc/compare/v0.5.0...v0.5.1) (2019-07-23)
 
 
 ### Bug Fixes
 
-* async generators on python 3.5 ([1c19229](https://github.com/standy66/purerpc/commit/1c19229))
+* async generators on python 3.5 ([1c19229](https://github.com/python-trio/purerpc/commit/1c19229))
 
 
 
-# [Release 0.5.0](https://github.com/standy66/purerpc/compare/v0.4.1...v0.5.0) (2019-07-23)
-
-
-### Features
-
-* can now pass contextmngr or setup_fn/teardown_fn to add_service ([208dd95](https://github.com/standy66/purerpc/commit/208dd95))
-
-
-
-# [Release 0.4.1](https://github.com/standy66/purerpc/compare/v0.4.0...v0.4.1) (2019-07-22)
+## [Release 0.5.0](https://github.com/python-trio/purerpc/compare/v0.4.1...v0.5.0) (2019-07-23)
 
 
 ### Features
 
-* remove undocumented use of raw_socket in anyio ([6de2c9a](https://github.com/standy66/purerpc/commit/6de2c9a))
+* can now pass contextmngr or setup_fn/teardown_fn to add_service ([208dd95](https://github.com/python-trio/purerpc/commit/208dd95))
 
 
 
-# [Release 0.4.0](https://github.com/standy66/purerpc/compare/v0.3.2...v0.4.0) (2019-07-22)
+## [Release 0.4.1](https://github.com/python-trio/purerpc/compare/v0.4.0...v0.4.1) (2019-07-22)
+
+
+### Features
+
+* remove undocumented use of raw_socket in anyio ([6de2c9a](https://github.com/python-trio/purerpc/commit/6de2c9a))
+
+
+
+## [Release 0.4.0](https://github.com/python-trio/purerpc/compare/v0.3.2...v0.4.0) (2019-07-22)
 
 
 ### Bug Fixes
 
-* speed improvements ([1cb3d46](https://github.com/standy66/purerpc/commit/1cb3d46))
+* speed improvements ([1cb3d46](https://github.com/python-trio/purerpc/commit/1cb3d46))
 
 
 ### Features
 
-* add state property to GRPCStream ([0019d8c](https://github.com/standy66/purerpc/commit/0019d8c))
-* answer PING frames ([c829901](https://github.com/standy66/purerpc/commit/c829901))
-* change MAX_CONCURRENT_STREAMS from 1000 to 65536 ([d2d461f](https://github.com/standy66/purerpc/commit/d2d461f))
-* decouple h2 and grpclib logic ([1f4e6b0](https://github.com/standy66/purerpc/commit/1f4e6b0))
-* support percent-encoded grpc-message header ([c6636f4](https://github.com/standy66/purerpc/commit/c6636f4))
+* add state property to GRPCStream ([0019d8c](https://github.com/python-trio/purerpc/commit/0019d8c))
+* answer PING frames ([c829901](https://github.com/python-trio/purerpc/commit/c829901))
+* change MAX_CONCURRENT_STREAMS from 1000 to 65536 ([d2d461f](https://github.com/python-trio/purerpc/commit/d2d461f))
+* decouple h2 and grpclib logic ([1f4e6b0](https://github.com/python-trio/purerpc/commit/1f4e6b0))
+* support percent-encoded grpc-message header ([c6636f4](https://github.com/python-trio/purerpc/commit/c6636f4))
 * change default max message length to 32 MB
 
 
-# [Release 0.3.2](https://github.com/standy66/purerpc/compare/v0.3.1...v0.3.2) (2019-02-15)
+## [Release 0.3.2](https://github.com/python-trio/purerpc/compare/v0.3.1...v0.3.2) (2019-02-15)
 
 
 ### Bug Fixes
 
-* fix dependencies, remove some of anyio monkey patches ([ac6c5c2](https://github.com/standy66/purerpc/commit/ac6c5c2))
+* fix dependencies, remove some of anyio monkey patches ([ac6c5c2](https://github.com/python-trio/purerpc/commit/ac6c5c2))
 
 
 
-# [Release 0.3.1](https://github.com/standy66/purerpc/compare/v0.3.0...v0.3.1) (2019-02-15)
+## [Release 0.3.1](https://github.com/python-trio/purerpc/compare/v0.3.0...v0.3.1) (2019-02-15)
 
 
 ### Bug Fixes
 
-* fix pickling error in purerpc.test_utils._WrappedResult ([9f0a63d](https://github.com/standy66/purerpc/commit/9f0a63d))
+* fix pickling error in purerpc.test_utils._WrappedResult ([9f0a63d](https://github.com/python-trio/purerpc/commit/9f0a63d))
 
 
 
-# [Release 0.3.0](https://github.com/standy66/purerpc/compare/v0.2.1...v0.3.0) (2019-02-14)
+## [Release 0.3.0](https://github.com/python-trio/purerpc/compare/v0.2.1...v0.3.0) (2019-02-14)
 
 
 ### Features
 
-* expose new functions in purerpc.test_utils ([07b10e1](https://github.com/standy66/purerpc/commit/07b10e1))
-* migrate to pytest ([95c0a8b](https://github.com/standy66/purerpc/commit/95c0a8b))
+* expose new functions in purerpc.test_utils ([07b10e1](https://github.com/python-trio/purerpc/commit/07b10e1))
+* migrate to pytest ([95c0a8b](https://github.com/python-trio/purerpc/commit/95c0a8b))
 
 
 ### BREAKING CHANGES
@@ -102,15 +104,15 @@
 
 
 
-# [Release 0.2.0](https://github.com/standy66/purerpc/compare/v0.1.6...v0.2.0) (2019-02-10)
+## [Release 0.2.0](https://github.com/python-trio/purerpc/compare/v0.1.6...v0.2.0) (2019-02-10)
 
 
 ### Features
 
-* add backend option to Server.serve ([5f47f8e](https://github.com/standy66/purerpc/commit/5f47f8e))
-* add support for Python 3.5 ([a681192](https://github.com/standy66/purerpc/commit/a681192))
-* improved exception handling in test utils ([b1df796](https://github.com/standy66/purerpc/commit/b1df796))
-* migrate to anyio ([746b1c2](https://github.com/standy66/purerpc/commit/746b1c2))
+* add backend option to Server.serve ([5f47f8e](https://github.com/python-trio/purerpc/commit/5f47f8e))
+* add support for Python 3.5 ([a681192](https://github.com/python-trio/purerpc/commit/a681192))
+* improved exception handling in test utils ([b1df796](https://github.com/python-trio/purerpc/commit/b1df796))
+* migrate to anyio ([746b1c2](https://github.com/python-trio/purerpc/commit/746b1c2))
 
 
 ### BREAKING CHANGES

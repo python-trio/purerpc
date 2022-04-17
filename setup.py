@@ -24,7 +24,7 @@ def main():
         ),
         long_description_content_type='text/markdown',
         author="Andrew Stepanov",
-        url="https://github.com/standy66/purerpc",
+        url="https://github.com/python-trio/purerpc",
         classifiers=[
             "Development Status :: 4 - Beta",
             "Intended Audience :: Developers",
@@ -44,7 +44,6 @@ def main():
             "Programming Language :: Python :: Implementation :: PyPy",
             "Framework :: AsyncIO",
             "Framework :: Trio",
-            "Framework :: Pytest",
             "Topic :: Internet",
             "Topic :: Internet :: WWW/HTTP",
             "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
