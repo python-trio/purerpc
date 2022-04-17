@@ -2,19 +2,26 @@
 
 [![Build Status](https://img.shields.io/github/workflow/status/python-trio/purerpc/CI)](https://github.com/python-trio/purerpc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/purerpc.svg?style=flat)](https://pypi.org/project/purerpc/)
-[![Downloads](https://pepy.tech/badge/purerpc/month)](https://pepy.tech/project/purerpc)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/purerpc.svg)](https://pypi.org/project/purerpc)
 
-Asynchronous pure Python gRPC client and server implementation supporting
+_purerpc_ is a native, async Python gRPC client and server implementation supporting
 [asyncio](https://docs.python.org/3/library/asyncio.html),
-[uvloop](https://github.com/MagicStack/uvloop),
+[uvloop](https://github.com/MagicStack/uvloop), and
 [trio](https://github.com/python-trio/trio) (achieved with [anyio](https://github.com/agronholm/anyio) compatibility layer).
+
+This project is in maintenance mode.  Updates will primarily be limited to fixing
+severe bugs, keeping the package usable for actively developed projects, and
+easing maintenance.
+
+For use cases limited to asyncio, consider the Python package published by the
+main [grpc](https://github.com/grpc/grpc) project instead.
 
 ## Requirements
 
 * CPython >= 3.7
 * PyPy >= 3.7
 
-NOTE: PyPy support is tentative, as grpcio dependency [doesn't officially
+NOTE: PyPy support is tentative, as the grpcio dependency [doesn't officially
   suport it](https://github.com/grpc/grpc/issues/4221).  (The dependency should
 be removed, since it's only used by tests, examples, and offline tools.)
 
@@ -29,7 +36,7 @@ pip install purerpc
 Latest development version:
 
 ```bash
-pip install git+https://github.com/standy66/purerpc.git
+pip install git+https://github.com/python-trio/purerpc.git
 ```
 
 By default purerpc uses asyncio event loop, if you want to use uvloop or trio, please install them manually.
@@ -110,3 +117,15 @@ if __name__ == '__main__':
 You can mix server and client code, for example make a server that requests something using purerpc from another gRPC server, etc.
 
 More examples in `misc/` folder
+
+# Project history
+
+purerpc was originally written by [Andrew Stepanov](https://github.com/standy66)
+and used the curio async event loop.  Later it
+was migrated to the [anyio](https://github.com/agronholm/anyio) API, supporting
+asyncio, curio, uvloop, and trio (though curio support has since been dropped
+from the API).
+
+After going a few years unmaintained, the project was adopted by the [python-trio
+organization](https://github.com/python-trio) with the intent of ensuring a
+continued gRPC solution for Trio users.

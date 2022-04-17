@@ -16,7 +16,7 @@ def main():
         name="purerpc",
         version=__version__,
         license="Apache License Version 2.0",
-        description=("Asynchronous pure Python gRPC client and server implementation "
+        description=("Native, async Python gRPC client and server implementation "
                      "supporting asyncio, uvloop, trio"),
         long_description='%s\n%s' % (
             re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.md')),
