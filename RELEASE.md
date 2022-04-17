@@ -1,6 +1,6 @@
 # Release history
 
-## (pending)
+## Release 0.7.0 (2022-04-17)
 
 ### Features
 
