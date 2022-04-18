@@ -63,6 +63,7 @@ def main():
             "h2>=3.1.0,<4",
             "protobuf>=3.5.1",
             "anyio>=3.0.0",
+            "tblib>=1.3.2",
             "async_generator>=1.10",  # for aclosing() only (Python < 3.10)
         ],
         entry_points={
@@ -74,7 +75,6 @@ def main():
                 "grpcio>=1.25.0",           # fix version for PyPy
                 "grpcio_tools>=1.25.0",     # same here
                 "uvloop",
-                "tblib>=1.3.2",
                 "trio>=0.11",
                 "python-forge>=18.6",
                 "trustme",
