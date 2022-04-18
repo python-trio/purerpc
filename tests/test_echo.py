@@ -204,14 +204,16 @@ async def test_purerpc_client_disconnect(echo_pb2, echo_grpc):
         port = await tg.start(server.serve_async)
 
         # client
-        async with purerpc.insecure_channel("localhost", port) as channel:
-            stub = echo_grpc.EchoStub(channel)
+        with pytest.raises(anyio.ClosedResourceError):
+            async with purerpc.insecure_channel("localhost", port) as channel:
+                stub = echo_grpc.EchoStub(channel)
 
-            data = 'hello'
-            assert (await stub.Echo(echo_pb2.EchoRequest(data=data))).data == data
+                data = 'hello'
+                assert (await stub.Echo(echo_pb2.EchoRequest(data=data))).data == data
 
-            # close the sending stream, inducing EndOfStream on the server
-            await channel._grpc_socket._socket._stream.aclose()
+                # close the sending stream, inducing EndOfStream on the server
+                await channel._grpc_socket._socket._stream.aclose()
+                await anyio.wait_all_tasks_blocked()
 
         assert server._connection_count == 1
         assert server._exception_count == 0
