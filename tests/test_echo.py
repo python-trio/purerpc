@@ -196,11 +196,11 @@ async def test_purerpc_client_disconnect(echo_pb2, echo_grpc):
     # NOTE: This test demonstrates a client/server test without multiprocessing or
     #  fixture acrobatics.
 
-    # server
-    Servicer = make_servicer(echo_pb2, echo_grpc)
-    server = purerpc.Server(port=0)
-    server.add_service(Servicer().service)
     async with anyio.create_task_group() as tg:
+        # server
+        Servicer = make_servicer(echo_pb2, echo_grpc)
+        server = purerpc.Server(port=0)
+        server.add_service(Servicer().service)
         port = await tg.start(server.serve_async)
 
         # client
