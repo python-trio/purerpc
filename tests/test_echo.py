@@ -1,6 +1,7 @@
 import functools
 import ssl
 
+import anyio
 import pytest
 import trustme
 
@@ -28,8 +29,7 @@ def client_ssl_context(ca):
     return client_context
 
 
-@pytest.fixture(scope="module")
-def purerpc_echo_port(echo_pb2, echo_grpc):
+def make_servicer(echo_pb2, echo_grpc):
     class Servicer(echo_grpc.EchoServicer):
         async def Echo(self, message):
             return echo_pb2.EchoReply(data=message.data)
@@ -54,6 +54,12 @@ def purerpc_echo_port(echo_pb2, echo_grpc):
                 data.append(message.data)
             yield echo_pb2.EchoReply(data="".join(data))
 
+    return Servicer
+
+
+@pytest.fixture(scope="module")
+def purerpc_echo_port(echo_pb2, echo_grpc):
+    Servicer = make_servicer(echo_pb2, echo_grpc)
     with run_purerpc_service_in_process(Servicer().service) as port:
         # TODO: migrate to serve_async() to avoid timing problems
         import time
@@ -63,30 +69,7 @@ def purerpc_echo_port(echo_pb2, echo_grpc):
 
 @pytest.fixture(scope="module")
 def purerpc_echo_port_ssl(echo_pb2, echo_grpc, server_ssl_context):
-    class Servicer(echo_grpc.EchoServicer):
-        async def Echo(self, message):
-            return echo_pb2.EchoReply(data=message.data)
-
-        async def EchoTwoTimes(self, message):
-            yield echo_pb2.EchoReply(data=message.data)
-            yield echo_pb2.EchoReply(data=message.data)
-
-        async def EchoEachTime(self, messages):
-            async for message in messages:
-                yield echo_pb2.EchoReply(data=message.data)
-
-        async def EchoLast(self, messages):
-            data = []
-            async for message in messages:
-                data.append(message.data)
-            return echo_pb2.EchoReply(data="".join(data))
-
-        async def EchoLastV2(self, messages):
-            data = []
-            async for message in messages:
-                data.append(message.data)
-            yield echo_pb2.EchoReply(data="".join(data))
-
+    Servicer = make_servicer(echo_pb2, echo_grpc)
     with run_purerpc_service_in_process(Servicer().service,
                                         ssl_context=server_ssl_context) as port:
         # TODO: migrate to serve_async() to avoid timing problems
@@ -204,3 +187,32 @@ async def test_purerpc_ssl(echo_pb2, echo_grpc, purerpc_echo_port_ssl, client_ss
 
         assert [response.data for response in await async_iterable_to_list(
                 stub.EchoLastV2(gen()))] == [data * 20]
+
+
+@async_test
+async def test_purerpc_client_disconnect(echo_pb2, echo_grpc):
+    # when the client disconnects, the server should not log an exception
+    #
+    # NOTE: This test demonstrates a client/server test without multiprocessing or
+    #  fixture acrobatics.
+
+    # server
+    Servicer = make_servicer(echo_pb2, echo_grpc)
+    server = purerpc.Server(port=0)
+    server.add_service(Servicer().service)
+    async with anyio.create_task_group() as tg:
+        port = await tg.start(server.serve_async)
+
+        # client
+        async with purerpc.insecure_channel("localhost", port) as channel:
+            stub = echo_grpc.EchoStub(channel)
+
+            data = 'hello'
+            assert (await stub.Echo(echo_pb2.EchoRequest(data=data))).data == data
+
+            # close the sending stream, inducing EndOfStream on the server
+            await channel._grpc_socket._socket._stream.aclose()
+
+        assert server._connection_count == 1
+        assert server._exception_count == 0
+        tg.cancel_scope.cancel()

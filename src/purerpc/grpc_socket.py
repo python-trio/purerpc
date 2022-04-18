@@ -231,8 +231,9 @@ class GRPCSocket(AsyncExitStack):
 
     async def _listen(self):
         while True:
-            data = await self._socket.recv(self._receive_buffer_size)
-            if not data:
+            try:
+                data = await self._socket.recv(self._receive_buffer_size)
+            except (anyio.EndOfStream, anyio.BrokenResourceError):
                 return
             events = self._grpc_connection.receive_data(data)
             await self._socket.flush()
