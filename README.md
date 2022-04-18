@@ -23,10 +23,6 @@ main [grpc](https://github.com/grpc/grpc) project instead.
 * CPython >= 3.7
 * PyPy >= 3.7
 
-NOTE: PyPy support is tentative, as the grpcio dependency [doesn't officially
-  suport it](https://github.com/grpc/grpc/issues/4221).  (The dependency should
-be removed, since it's only used by tests, examples, and offline tools.)
-
 ## Installation
 
 Latest PyPI version:
@@ -41,7 +37,14 @@ Latest development version:
 pip install git+https://github.com/python-trio/purerpc.git
 ```
 
-By default purerpc uses asyncio event loop, if you want to use uvloop or trio, please install them manually.
+These invocations only install purerpc and its runtime dependencies.
+
+To install extra dependencies for proto generation, examples, and tests,
+add the `[test]` suffix (like `pip install purerpc[test]`).  (This may
+not work with PyPy, sine the grpcio dependency [doesn't officially suport
+it](https://github.com/grpc/grpc/issues/4221).)
+
+(TODO: split extra dependencies into `plugin` and `dev`)
 
 ## protoc plugin
 
@@ -52,7 +55,7 @@ so you can use it to generate service definition and stubs:
 protoc --purerpc_out=. --python_out=. -I. greeter.proto
 ```
 
-or, if you installed `grpcio_tools` Python package:
+or, if you installed the `grpcio-tools` Python package:
 
 ```bash
 python -m grpc_tools.protoc --purerpc_out=. --python_out=. -I. greeter.proto
