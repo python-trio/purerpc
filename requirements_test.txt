@@ -82,7 +82,7 @@ typing-extensions==4.1.1
     # via
     #   anyio
     #   importlib-metadata
-uvloop==0.16.0
+uvloop==0.16.0; platform_system!='Windows'
     # via purerpc (setup.py)
 zipp==3.8.0
     # via importlib-metadata

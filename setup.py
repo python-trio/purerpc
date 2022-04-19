@@ -74,7 +74,7 @@ def main():
                 "pytest",
                 "grpcio>=1.25.0",           # fix version for PyPy
                 "grpcio_tools>=1.25.0",     # same here
-                "uvloop",
+                "uvloop; platform_system!='Windows'",
                 "trio>=0.11",
                 "python-forge>=18.6",
                 "trustme",
