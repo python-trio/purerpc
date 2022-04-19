@@ -32,7 +32,7 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install .[test]
+      - run: pip install .[dev]
       - run: pytest
 
   build_and_test_pypy:

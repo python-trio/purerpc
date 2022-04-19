@@ -28,27 +28,28 @@ main [grpc](https://github.com/grpc/grpc) project instead.
 Latest PyPI version:
 
 ```bash
-pip install purerpc
+pip install purerpc[grpc]
 ```
+
+NOTE: for PyPy, replace "grpc" with "grpc-pypy".  Support is tentative, as
+  [grpc does not officially support PyPy](https://github.com/grpc/grpc/issues/4221).
 
 Latest development version:
 
 ```bash
-pip install git+https://github.com/python-trio/purerpc.git
+pip install git+https://github.com/python-trio/purerpc.git[grpc]
 ```
 
-These invocations only install purerpc and its runtime dependencies.
+These invocations will include dependencies for the grpc runtime and
+generation of service stubs.
 
-To install extra dependencies for proto runtime, proto generation, examples, and
-tests, add the `[test]` suffix (like `pip install purerpc[test]`).  (This may
-not work with PyPy, since the grpcio dependency [doesn't officially suport
-it](https://github.com/grpc/grpc/issues/4221).)
-
-(TODO: split extra dependencies into `plugin` and `dev`)
+To install extra dependencies for running tests or examples, using the
+`test_utils` module, etc., apply the `[dev]` suffix (e.g.
+`pip install purerpc[dev]`).
 
 ## protoc plugin
 
-purerpc adds `protoc-gen-purerpc` plugin for `protoc` to your `PATH` enviroment variable
+purerpc adds `protoc-gen-purerpc` plugin for `protoc` to your `PATH` environment variable
 so you can use it to generate service definition and stubs: 
 
 ```bash
