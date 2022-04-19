@@ -39,9 +39,9 @@ pip install git+https://github.com/python-trio/purerpc.git
 
 These invocations only install purerpc and its runtime dependencies.
 
-To install extra dependencies for proto generation, examples, and tests,
-add the `[test]` suffix (like `pip install purerpc[test]`).  (This may
-not work with PyPy, sine the grpcio dependency [doesn't officially suport
+To install extra dependencies for proto runtime, proto generation, examples, and
+tests, add the `[test]` suffix (like `pip install purerpc[test]`).  (This may
+not work with PyPy, since the grpcio dependency [doesn't officially suport
 it](https://github.com/grpc/grpc/issues/4221).)
 
 (TODO: split extra dependencies into `plugin` and `dev`)
