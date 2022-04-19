@@ -90,6 +90,8 @@ class Server:
         self.port = port
         self._ssl_context = ssl_context
         self.services = {}
+        self._connection_count = 0
+        self._exception_count = 0
 
     def add_service(self, service=None, context_manager=None, setup_fn=None, teardown_fn=None, name=None):
         if (service is not None) + (context_manager is not None) + (setup_fn is not None) != 1:
@@ -134,7 +136,7 @@ class Server:
             for key, value in self.services.items():
                 services_dict[key] = await stack.enter_async_context(value)
 
-            await tcp_server.serve(ConnectionHandler(services_dict))
+            await tcp_server.serve(ConnectionHandler(services_dict, self))
 
     def serve(self, backend=None):
         """
@@ -150,10 +152,10 @@ class Server:
 class ConnectionHandler:
     RECEIVE_BUFFER_SIZE = 65536
 
-    def __init__(self, services: dict):
+    def __init__(self, services: dict, server: Server):
         self.config = GRPCConfiguration(client_side=False)
-        self.grpc_socket = None
         self.services = services
+        self._server = server
 
     async def request_received(self, stream: GRPCProtoStream):
         try:
@@ -212,15 +214,19 @@ class ConnectionHandler:
 
     async def __call__(self, stream_: anyio.abc.SocketStream):
         # TODO: Should at least pass through GeneratorExit
+        self._server._connection_count += 1
         try:
-            async with GRPCProtoSocket(self.config, stream_) as self.grpc_socket:
+            async with GRPCProtoSocket(self.config, stream_) as grpc_socket:
                 # TODO: resource usage warning
                 # TODO: TaskGroup() uses a lot of memory if the connection is kept for a long time
                 # TODO: do we really need it here?
                 async with anyio.create_task_group() as task_group:
-                    async for stream in self.grpc_socket.listen():
+                    async for stream in grpc_socket.listen():
                         task_group.start_soon(self.request_received, stream)
         except:
             # TODO: limit catch to Exception, so async cancel can propagate
+            # TODO: migrate off this broad catching of exceptions.  The library
+            #  user should decide the policy.
             log.warning("Got exception in main dispatch loop",
                         exc_info=log.getEffectiveLevel() == logging.DEBUG)
+            self._server._exception_count += 1
