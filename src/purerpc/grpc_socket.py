@@ -233,6 +233,9 @@ class GRPCSocket(AsyncExitStack):
         while True:
             try:
                 data = await self._socket.recv(self._receive_buffer_size)
+            # TODO: Not too confident that BrokenResourceError should be treated
+            #  the same as EndOfStream (maybe the handler wants to know?), but it's
+            #  here for parity with anyio 1.x behavior.
             except (anyio.EndOfStream, anyio.BrokenResourceError):
                 return
             events = self._grpc_connection.receive_data(data)
