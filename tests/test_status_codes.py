@@ -8,7 +8,9 @@ import pytest
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
-    grpc_client_parallelize, async_test, purerpc_channel
+    grpc_client_parallelize, purerpc_channel
+
+pytestmark = pytest.mark.anyio
 
 
 def regex_and(first, second):
@@ -117,9 +119,8 @@ def test_grpc_client_wrong_method_name(greeter_pb2, greeter_pb2_grpc, channel):
     with pytest.raises(BaseException, match=r"not implemented"):
         stub.SayHello(greeter_pb2.HelloRequest(name="World"))
 
-@async_test
 @purerpc_channel("grpc_empty_servicer_port")
-async def test_urerpc_client_empty_servicer(greeter_pb2, greeter_grpc, channel):
+async def test_purerpc_client_empty_servicer(greeter_pb2, greeter_grpc, channel):
     stub = greeter_grpc.GreeterStub(channel)
     with pytest.raises(purerpc.UnimplementedError):
         await stub.SayHello(greeter_pb2.HelloRequest(name="World"))
@@ -135,7 +136,6 @@ def test_grpc_client_status_codes(status_code_tuple, greeter_pb2, greeter_pb2_gr
 
 
 @pytest.mark.parametrize("status_code_tuple", STATUS_CODES)
-@async_test
 @purerpc_channel("port")
 async def test_purerpc_client_status_codes(status_code_tuple, greeter_pb2, greeter_grpc, channel):
     purerpc_exception = status_code_tuple[0]

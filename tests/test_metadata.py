@@ -5,7 +5,9 @@ import base64
 import pytest
 
 from purerpc.test_utils import (run_purerpc_service_in_process, run_grpc_service_in_process, grpc_client_parallelize,
-                                grpc_channel, async_test, purerpc_channel)
+                                grpc_channel, purerpc_channel)
+
+pytestmark = pytest.mark.anyio
 
 
 METADATA = (
@@ -56,7 +58,6 @@ def test_metadata_grpc_client(greeter_pb2, greeter_pb2_grpc, channel):
     assert METADATA == received_metadata
 
 
-@async_test
 @purerpc_channel("grpc_port")
 async def test_metadata_grpc_server_purerpc_client(greeter_pb2, greeter_grpc, channel):
     stub = greeter_grpc.GreeterStub(channel)
@@ -68,7 +69,6 @@ async def test_metadata_grpc_server_purerpc_client(greeter_pb2, greeter_grpc, ch
     assert METADATA == received_metadata
 
 
-@async_test
 @purerpc_channel("purerpc_port")
 async def test_metadata_purerpc_server_purerpc_client(greeter_pb2, greeter_grpc, channel):
     stub = greeter_grpc.GreeterStub(channel)

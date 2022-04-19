@@ -6,8 +6,10 @@ import purerpc
 
 from purerpc.test_utils import (
     run_purerpc_service_in_process, run_grpc_service_in_process, async_iterable_to_list, grpc_client_parallelize,
-    async_test, purerpc_channel, purerpc_client_parallelize, grpc_channel
+    purerpc_channel, purerpc_client_parallelize, grpc_channel
 )
+
+pytestmark = pytest.mark.anyio
 
 
 def name_generator(greeter_pb2):
@@ -124,7 +126,6 @@ def test_grpc_client_parallel(greeter_pb2, greeter_pb2_grpc, channel):
            ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
 
 
-@async_test
 @purerpc_channel("greeter_port")
 @purerpc_client_parallelize(50)
 async def test_purerpc_stub_client_parallel(greeter_pb2, greeter_grpc, channel):
@@ -138,7 +139,6 @@ async def test_purerpc_stub_client_parallel(greeter_pb2, greeter_grpc, channel):
            ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
 
 
-@async_test
 @purerpc_channel("greeter_port")
 @purerpc_client_parallelize(50)
 async def test_purerpc_stream_client_parallel(greeter_pb2, channel):

@@ -6,7 +6,9 @@ from async_generator import aclosing
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
-    grpc_client_parallelize, purerpc_channel, async_test
+    grpc_client_parallelize, purerpc_channel
+
+pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +65,6 @@ def test_errors_grpc_client(greeter_pb2, greeter_pb2_grpc, channel):
             pass
 
 
-@async_test
 @purerpc_channel("port")
 async def test_errors_purerpc_client(greeter_pb2, greeter_grpc, channel):
     async def generator():

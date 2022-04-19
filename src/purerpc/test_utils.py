@@ -22,8 +22,6 @@ import forge
 import anyio
 from async_generator import aclosing
 
-from .utils import run as purerpc_run
-
 # work around pickle issue on macOS
 if sys.platform == 'darwin':
     multiprocessing = multiprocessing.get_context('fork')
@@ -119,7 +117,7 @@ def _run_context_manager_generator_in_process(cm_gen):
             parent_conn.close()
 
 
-def run_purerpc_service_in_process(service, ssl_context=None):
+def _run_purerpc_service_in_process(service, ssl_context=None):
     # TODO: there is no reason to run the server as a separate process...
     #   just use serve_async().  This synchronous cm has timing problems,
     #   because the server may not be listening before yielding to the body.
@@ -152,6 +150,14 @@ def run_purerpc_service_in_process(service, ssl_context=None):
         # cProfile.runctx("purerpc_run(main)", globals(), locals(), sort="tottime")
 
     return _run_context_manager_generator_in_process(target_fn)
+
+
+@contextlib.contextmanager
+def run_purerpc_service_in_process(service, ssl_context=None):
+    with _run_purerpc_service_in_process(service, ssl_context=ssl_context) as port:
+        # work around API issue, giving server a chance to listen
+        time.sleep(.05)
+        yield port
 
 
 # TODO: remove grpcio dependency from tests.  There is no reason to unit test
@@ -190,16 +196,6 @@ def run_tests_in_workers(*, target, num_workers):
         parent_conn.close()
         for process in processes:
             process.join()
-
-
-def async_test(corofunc):
-    if not inspect.iscoroutinefunction(corofunc):
-        raise TypeError("Expected coroutine function")
-
-    @functools.wraps(corofunc)
-    def func(**kwargs):
-        return purerpc_run(functools.partial(corofunc, **kwargs))
-    return func
 
 
 def grpc_client_parallelize(num_workers):

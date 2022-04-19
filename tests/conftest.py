@@ -1,6 +1,21 @@
+import platform
+
 import pytest
 
 from purerpc.test_utils import compile_temp_proto
+
+pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture(params=[
+    pytest.param(('trio'), id='trio'),
+    pytest.param(('asyncio'), id='asyncio'),
+    pytest.param(('asyncio', dict(use_uvloop=True)), id='uvloop',
+                 marks=[pytest.mark.skipif(platform.system() == 'Windows',
+                                           reason='uvloop not supported on Windows')]),
+])
+def anyio_backend(request):
+    return request.param
 
 
 @pytest.fixture(scope="session")

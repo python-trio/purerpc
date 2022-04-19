@@ -7,7 +7,9 @@ import trustme
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, \
-    async_iterable_to_list, random_payload, grpc_client_parallelize, async_test, purerpc_channel, purerpc_client_parallelize, grpc_channel
+    async_iterable_to_list, random_payload, grpc_client_parallelize, purerpc_channel, purerpc_client_parallelize, grpc_channel
+
+pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture(scope='module')
@@ -61,9 +63,6 @@ def make_servicer(echo_pb2, echo_grpc):
 def purerpc_echo_port(echo_pb2, echo_grpc):
     Servicer = make_servicer(echo_pb2, echo_grpc)
     with run_purerpc_service_in_process(Servicer().service) as port:
-        # TODO: migrate to serve_async() to avoid timing problems
-        import time
-        time.sleep(.1)
         yield port
 
 
@@ -72,9 +71,6 @@ def purerpc_echo_port_ssl(echo_pb2, echo_grpc, server_ssl_context):
     Servicer = make_servicer(echo_pb2, echo_grpc)
     with run_purerpc_service_in_process(Servicer().service,
                                         ssl_context=server_ssl_context) as port:
-        # TODO: migrate to serve_async() to avoid timing problems
-        import time
-        time.sleep(.1)
         yield port
 
 
@@ -115,7 +111,6 @@ def echo_port(request):
     return request.getfixturevalue(request.param)
 
 
-@async_test
 @purerpc_channel("echo_port")
 @purerpc_client_parallelize(50)
 async def test_purerpc_client_large_payload_many_streams(echo_pb2, echo_grpc, channel):
@@ -124,7 +119,6 @@ async def test_purerpc_client_large_payload_many_streams(echo_pb2, echo_grpc, ch
     assert (await stub.Echo(echo_pb2.EchoRequest(data=data))).data == data
 
 
-@async_test
 @purerpc_channel("echo_port")
 async def test_purerpc_client_large_payload_one_stream(echo_pb2, echo_grpc, channel):
     stub = echo_grpc.EchoStub(channel)
@@ -140,7 +134,6 @@ def test_grpc_client_large_payload(echo_pb2, echo_pb2_grpc, channel):
     assert stub.Echo(echo_pb2.EchoRequest(data=data)).data == data
 
 
-@async_test
 @purerpc_channel("echo_port")
 @purerpc_client_parallelize(20)
 async def test_purerpc_client_random_payload(echo_pb2, echo_grpc, channel):
@@ -159,7 +152,6 @@ async def test_purerpc_client_random_payload(echo_pb2, echo_grpc, channel):
             stub.EchoEachTime(gen()))] == [data] * 4
 
 
-@async_test
 @purerpc_channel("echo_port")
 @purerpc_client_parallelize(10)
 async def test_purerpc_client_deadlock(echo_pb2, echo_grpc, channel):
@@ -174,7 +166,6 @@ async def test_purerpc_client_deadlock(echo_pb2, echo_grpc, channel):
             stub.EchoLastV2(gen()))] == [data * 20]
 
 
-@async_test
 async def test_purerpc_ssl(echo_pb2, echo_grpc, purerpc_echo_port_ssl, client_ssl_context):
     async with purerpc.secure_channel("127.0.0.1", purerpc_echo_port_ssl,
                                       ssl_context=client_ssl_context) as channel:
@@ -189,7 +180,6 @@ async def test_purerpc_ssl(echo_pb2, echo_grpc, purerpc_echo_port_ssl, client_ss
                 stub.EchoLastV2(gen()))] == [data * 20]
 
 
-@async_test
 async def test_purerpc_client_disconnect(echo_pb2, echo_grpc):
     # when the client disconnects, the server should not log an exception
     #
