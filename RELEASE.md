@@ -1,5 +1,13 @@
 # Release history
 
+## Release 0.7.1 (2022-04-19)
+
+### Bug Fixes
+
+* fix server end-of-stream handling, where normal client disconnects were
+  being logged as exceptions
+
+
 ## Release 0.7.0 (2022-04-17)
 
 ### Features
