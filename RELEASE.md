@@ -1,5 +1,20 @@
 # Release history
 
+## Release 0.8.0 (2022-04-20)
+
+### Development
+
+* test runs now cover all backends automatically, so multiple invocations
+  of pytest are no longer needed
+
+### BREAKING CHANGES
+
+* revise dependency management.  The default requirements are strictly for
+  purerpc's direct dependencies.  Use requirements extra "grpc" for grpc
+  runtime and stub generation.  Use "dev" for running tests or examples,
+  using the test_utils module, etc.
+
+
 ## Release 0.7.1 (2022-04-19)
 
 ### Bug Fixes
