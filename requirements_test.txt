@@ -56,7 +56,7 @@ pip-tools==6.6.0
     # via purerpc (setup.py)
 pluggy==1.0.0
     # via pytest
-protobuf==3.20.0
+protobuf==3.20.2
     # via grpcio-tools
 py==1.11.0
     # via pytest
