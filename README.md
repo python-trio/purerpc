@@ -1,7 +1,7 @@
 # purerpc
 
 <!-- start-badges -->
-[![Build Status](https://img.shields.io/github/workflow/status/python-trio/purerpc/CI)](https://github.com/python-trio/purerpc/actions/workflows/ci.yml)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/python-trio/purerpc/ci.yml)](https://github.com/python-trio/purerpc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/purerpc.svg?style=flat)](https://pypi.org/project/purerpc/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/purerpc.svg)](https://pypi.org/project/purerpc)
 <!-- end-badges -->
