@@ -1,4 +1,5 @@
 import anyio
+from contextlib import asynccontextmanager
 from async_generator import aclosing
 
 from .grpclib.exceptions import ProtocolError, raise_status
@@ -107,12 +108,13 @@ class ClientStubStreamUnary(ClientStub):
 
 
 class ClientStubStreamStream(ClientStub):
+    @asynccontextmanager
     async def call_aiter(self, message_aiter, metadata):
         stream = await self._stream_fn(metadata=metadata)
+
         async with anyio.create_task_group() as task_group:
             task_group.start_soon(send_multiple_messages_client, stream, message_aiter)
-            async for value in stream_to_async_iterator(stream):
-                yield value
+            yield stream_to_async_iterator(stream)
 
     async def call_stream(self, metadata):
         return await self._stream_fn(metadata=metadata)

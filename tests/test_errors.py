@@ -2,8 +2,6 @@ import functools
 
 import pytest
 
-from async_generator import aclosing
-
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
     grpc_client_parallelize, purerpc_channel
@@ -75,8 +73,23 @@ async def test_errors_purerpc_client(greeter_pb2, greeter_grpc, channel):
     with pytest.raises(purerpc.RpcFailedError, match=r"oops my bad"):
         await stub.SayHello(greeter_pb2.HelloRequest(name="World"))
 
-    async with aclosing(stub.SayHelloToMany(generator())) as aiter:
+    async with stub.SayHelloToMany(generator()) as aiter:
         for _ in range(7):
             await aiter.__anext__()
         with pytest.raises(purerpc.RpcFailedError, match=r"Lucky 7"):
             await aiter.__anext__()
+
+
+@purerpc_channel("port")
+async def test_errors_purerpc_async_generator(greeter_pb2, greeter_grpc, channel):
+    async def generator():
+        for _ in range(7):
+            yield greeter_pb2.HelloRequest()
+
+    stub = greeter_grpc.GreeterStub(channel)
+
+    with pytest.raises(ValueError, match="oops"):
+        async with stub.SayHelloToMany(generator()) as aiter:
+            async for resp in aiter:
+                if resp.message == "2":
+                    raise ValueError("oops")
