@@ -60,7 +60,7 @@ def main():
         test_suite="tests",
         python_requires=">=3.7",
         install_requires=[
-            "h2>=3.1.0,<4",
+            "h2>=3.1.1,<4",
             "anyio>=3.0.0",
             "async_generator>=1.10",  # for aclosing() only (Python < 3.10)
         ],
