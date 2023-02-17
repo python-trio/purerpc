@@ -28,7 +28,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]  # TODO: windows-latest
+        # macos-latest disabled due to unexplained timeout
+        # https://github.com/python-trio/purerpc/issues/39
+        os: [ubuntu-latest]  # TODO: windows-latest
         python-version: ['3.10']
     steps:
       - uses: actions/checkout@v3
