@@ -25,12 +25,13 @@ jobs:
       - run: pytest
 
   build_and_test_latest:
+    # macos-latest disabled due to unexplained timeout
+    # https://github.com/python-trio/purerpc/issues/39
+    if: ${{ matrix.os != 'macos-latest' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-latest disabled due to unexplained timeout
-        # https://github.com/python-trio/purerpc/issues/39
-        os: [ubuntu-latest]  # TODO: windows-latest
+        os: [ubuntu-latest, macos-latest]  # TODO: windows-latest
         python-version: ['3.11']
     steps:
       - uses: actions/checkout@v3
