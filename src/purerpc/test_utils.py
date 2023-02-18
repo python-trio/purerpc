@@ -88,8 +88,9 @@ async def async_iterable_to_list(async_iterable):
 
 
 def random_payload(min_size=1000, max_size=100000):
-    return "".join(random.choice(string.ascii_letters)
-                   for _ in range(random.randint(min_size, max_size)))
+    return "".join(
+        random.choices(string.ascii_letters, k=random.randint(min_size, max_size))
+    )
 
 
 @contextlib.contextmanager
