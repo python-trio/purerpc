@@ -110,8 +110,9 @@ async def listen():
         reply = await stub.SayHello(HelloRequest(name="World"))
         print(reply.message)
 
-        async for reply in stub.SayHelloToMany(gen()):
-            print(reply.message)
+        async with stub.SayHelloToMany(gen()) as stream:
+            async for reply in stream:
+                print(reply.message)
 
 
 if __name__ == '__main__':

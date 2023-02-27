@@ -148,8 +148,10 @@ async def test_purerpc_client_random_payload(echo_pb2, echo_grpc, channel):
     assert [response.data for response in await async_iterable_to_list(
             stub.EchoTwoTimes(echo_pb2.EchoRequest(data=data)))] == [data] * 2
     assert (await stub.EchoLast(gen())).data == data * 4
-    assert [response.data for response in await async_iterable_to_list(
-            stub.EchoEachTime(gen()))] == [data] * 4
+    async with stub.EchoEachTime(gen()) as aiter:
+        assert [response.data for response in await async_iterable_to_list(aiter)] == [
+            data
+        ] * 4
 
 
 @purerpc_channel("echo_port")
@@ -162,8 +164,10 @@ async def test_purerpc_client_deadlock(echo_pb2, echo_grpc, channel):
         for _ in range(20):
             yield echo_pb2.EchoRequest(data=data)
 
-    assert [response.data for response in await async_iterable_to_list(
-            stub.EchoLastV2(gen()))] == [data * 20]
+    async with stub.EchoLastV2(gen()) as aiter:
+        assert [response.data for response in await async_iterable_to_list(aiter)] == [
+            data * 20
+        ]
 
 
 async def test_purerpc_ssl(echo_pb2, echo_grpc, purerpc_echo_port_ssl, client_ssl_context):
@@ -176,8 +180,10 @@ async def test_purerpc_ssl(echo_pb2, echo_grpc, purerpc_echo_port_ssl, client_ss
             for _ in range(20):
                 yield echo_pb2.EchoRequest(data=data)
 
-        assert [response.data for response in await async_iterable_to_list(
-                stub.EchoLastV2(gen()))] == [data * 20]
+        async with stub.EchoLastV2(gen()) as aiter:
+            assert [
+                response.data for response in await async_iterable_to_list(aiter)
+            ] == [data * 20]
 
 
 async def test_purerpc_client_disconnect(echo_pb2, echo_grpc):

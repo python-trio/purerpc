@@ -134,9 +134,10 @@ async def test_purerpc_stub_client_parallel(greeter_pb2, greeter_grpc, channel):
     assert [response.message for response in await async_iterable_to_list(
             stub.SayHelloGoodbye(greeter_pb2.HelloRequest(name="World")))] == ["Hello, World", "Goodbye, World"]
     assert (await stub.SayHelloToManyAtOnce(async_name_generator(greeter_pb2))).message == "Hello, Foo, Bar, Bat, Baz"
-    assert [response.message for response in await async_iterable_to_list(
-            stub.SayHelloToMany(async_name_generator(greeter_pb2)))] == \
-           ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
+    async with stub.SayHelloToMany(async_name_generator(greeter_pb2)) as aiter:
+        assert [
+            response.message for response in await async_iterable_to_list(aiter)
+        ] == ["Hello, Foo", "Hello, Bar", "Hello, Bat", "Hello, Baz"]
 
 
 @purerpc_channel("greeter_port")
