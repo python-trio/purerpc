@@ -11,6 +11,9 @@ def generate_import_statement(proto_name):
     module_path = proto_name[:-len(".proto")].replace("-", "_").replace("/", ".") + "_pb2"
     alias = get_python_module_alias(proto_name)
     if "." in module_path:
+        # produces import statements in line with grpcio so that tools for 
+        # postprocessing import statements work with purerpc as well
+        # example: `from foo.bar import zap_pb2 as foo_dot_bar_dot_zap__pb2`
         parent_modules, sub_module = module_path.rsplit(".", 1)
         return "from " + parent_modules + " import " + sub_module + " as " + alias
     else:
