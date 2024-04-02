@@ -1,6 +1,7 @@
 import functools
 
 import pytest
+import trio.testing
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
@@ -88,7 +89,7 @@ async def test_errors_purerpc_async_generator(greeter_pb2, greeter_grpc, channel
 
     stub = greeter_grpc.GreeterStub(channel)
 
-    with pytest.raises(ValueError, match="oops"):
+    with trio.testing.RaisesGroup(trio.testing.Matcher(ValueError, "oops"), strict=False):
         async with stub.SayHelloToMany(generator()) as aiter:
             async for resp in aiter:
                 if resp.message == "2":

@@ -82,7 +82,7 @@ def main():
                 "grpcio-tools",
                 "uvloop; platform_system!='Windows'",
                 "tblib>=1.3.2",
-                "trio>=0.11",
+                "trio>=0.24.0",
                 "pip-tools>=6.3.1",
                 "python-forge>=18.6",
                 "trustme",
