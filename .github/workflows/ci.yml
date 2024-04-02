@@ -10,6 +10,7 @@ jobs:
   build_and_test_pinned:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         python-version: ['3.7', '3.8', '3.9', '3.10']  # 'pypy-3.7'
