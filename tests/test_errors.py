@@ -6,6 +6,7 @@ import trio.testing
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
     grpc_client_parallelize, purerpc_channel
+from .exceptiongroups import unwrap_exceptiongroups_single
 
 pytestmark = pytest.mark.anyio
 
@@ -89,7 +90,7 @@ async def test_errors_purerpc_async_generator(greeter_pb2, greeter_grpc, channel
 
     stub = greeter_grpc.GreeterStub(channel)
 
-    with trio.testing.RaisesGroup(trio.testing.Matcher(ValueError, "oops"), strict=False):
+    with pytest.raises(ValueError, match="oops"), unwrap_exceptiongroups_single():
         async with stub.SayHelloToMany(generator()) as aiter:
             async for resp in aiter:
                 if resp.message == "2":
