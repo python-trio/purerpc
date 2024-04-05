@@ -1,7 +1,6 @@
 import functools
 
 import pytest
-import trio.testing
 
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, grpc_channel, \
