@@ -77,6 +77,7 @@ def main():
                 "grpcio-tools<=1.26",
             ],
             'dev': [
+                "exceptiongroup; python_version<'3.11'",
                 "pytest",
                 "grpcio",
                 "grpcio-tools",
