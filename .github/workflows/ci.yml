@@ -10,9 +10,10 @@ jobs:
   build_and_test_pinned:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ['3.7', '3.8', '3.9', '3.10']  # 'pypy-3.7'
+        python-version: ['3.8', '3.9', '3.10', '3.11']  # 'pypy-3.7'
     steps:
       - uses: actions/checkout@v3
       - name: Setup Python
@@ -31,7 +32,7 @@ jobs:
         # macos-latest disabled due to unexplained timeout
         # https://github.com/python-trio/purerpc/issues/39
         os: [ubuntu-latest]  # TODO: windows-latest
-        python-version: ['3.11']
+        python-version: ['3.12']
     steps:
       - uses: actions/checkout@v3
       - name: Setup Python

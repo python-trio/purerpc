@@ -8,6 +8,7 @@ import trustme
 import purerpc
 from purerpc.test_utils import run_purerpc_service_in_process, run_grpc_service_in_process, \
     async_iterable_to_list, random_payload, grpc_client_parallelize, purerpc_channel, purerpc_client_parallelize, grpc_channel
+from .exceptiongroups import unwrap_exceptiongroups_single
 
 pytestmark = pytest.mark.anyio
 
@@ -200,7 +201,7 @@ async def test_purerpc_client_disconnect(echo_pb2, echo_grpc):
         port = await tg.start(server.serve_async)
 
         # client
-        with pytest.raises(anyio.ClosedResourceError):
+        with pytest.raises(anyio.ClosedResourceError), unwrap_exceptiongroups_single():
             async with purerpc.insecure_channel("localhost", port) as channel:
                 stub = echo_grpc.EchoStub(channel)
 
