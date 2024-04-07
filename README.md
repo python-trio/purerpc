@@ -20,8 +20,8 @@ main [grpc](https://github.com/grpc/grpc) project instead.
 
 ## Requirements
 
-* CPython >= 3.7
-* PyPy >= 3.7
+* CPython >= 3.8
+* ? PyPy >= 3.8
 
 ## Installation
 
