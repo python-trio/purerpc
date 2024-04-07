@@ -25,11 +25,11 @@ cryptography==36.0.2
     # via trustme
 exceptiongroup==1.2.0 ; python_version < "3.11"
     # via purerpc (setup.py)
-grpcio==1.44.0
+grpcio==1.62.1
     # via
     #   grpcio-tools
     #   purerpc (setup.py)
-grpcio-tools==1.44.0
+grpcio-tools==1.48.2
     # via purerpc (setup.py)
 h2==3.2.0
     # via purerpc (setup.py)
@@ -72,8 +72,6 @@ pytest==7.1.1
     # via purerpc (setup.py)
 python-forge==18.6.0
     # via purerpc (setup.py)
-six==1.16.0
-    # via grpcio
 sniffio==1.2.0
     # via
     #   anyio
